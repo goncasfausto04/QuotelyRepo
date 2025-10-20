@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../supabaseClient";
+import { useNavigate } from "react-router-dom";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -7,21 +9,44 @@ export default function AuthPage() {
     password: "",
     name: "",
   });
+  const [errorMsg, setErrorMsg] = useState("");
+  const navigate = useNavigate();
 
-  const handleChange = (e) => {
+  // Redirect if already logged in
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) navigate("/dashboard");
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user) navigate("/dashboard");
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMsg("");
+
     if (isLogin) {
-      alert(`Logging in with\nEmail: ${formData.email}`);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+      if (error) setErrorMsg(error.message);
     } else {
-      alert(
-        `Registering new user\nName: ${formData.name}\nEmail: ${formData.email}`
-      );
+      const { error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+      });
+      if (error) setErrorMsg(error.message);
     }
-    setFormData({ email: "", password: "", name: "" });
   };
 
   return (
@@ -49,6 +74,8 @@ export default function AuthPage() {
             Register
           </button>
         </div>
+
+        {errorMsg && <p className="text-red-500 mb-2">{errorMsg}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
@@ -88,21 +115,15 @@ export default function AuthPage() {
           </button>
         </form>
 
-        {isLogin ? (
-          <p className="mt-4 text-center text-sm">
-            Don't have an account?{" "}
-            <button className="text-blue-500" onClick={() => setIsLogin(false)}>
-              Register
-            </button>
-          </p>
-        ) : (
-          <p className="mt-4 text-center text-sm">
-            Already have an account?{" "}
-            <button className="text-blue-500" onClick={() => setIsLogin(true)}>
-              Login
-            </button>
-          </p>
-        )}
+        <p className="mt-4 text-center text-sm">
+          {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+          <button
+            className="text-blue-500"
+            onClick={() => setIsLogin(!isLogin)}
+          >
+            {isLogin ? "Register" : "Login"}
+          </button>
+        </p>
       </div>
     </div>
   );
