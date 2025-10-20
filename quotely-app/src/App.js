@@ -4,6 +4,7 @@ import Footer from "./components/Footer";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
+import AuthPage from "./pages/AuthPage";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/auth" element={<AuthPage />} />
       </Routes>
       <Footer />
     </Router>

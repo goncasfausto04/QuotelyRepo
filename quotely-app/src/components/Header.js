@@ -11,6 +11,11 @@ export default function Header() {
         <Link className="mr-4" to="/dashboard">
           Dashboard
         </Link>
+
+        <Link to="/auth" className="mr-4">
+          Login/Register
+        </Link>
+        
         <Link to="/profile">Profile</Link>
       </nav>
     </header>
