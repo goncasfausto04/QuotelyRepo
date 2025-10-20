@@ -8,8 +8,10 @@ export default function AuthPage() {
     email: "",
     password: "",
     name: "",
+    confirmPassword: "",
   });
   const [errorMsg, setErrorMsg] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const navigate = useNavigate();
 
   // Redirect if already logged in
@@ -27,8 +29,12 @@ export default function AuthPage() {
     return () => listener.subscription.unsubscribe();
   }, [navigate]);
 
-  const handleChange = (e) =>
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    // Clear any password validation message when user edits password fields
+    if (name === "password" || name === "confirmPassword") setPasswordError("");
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,6 +47,12 @@ export default function AuthPage() {
       });
       if (error) setErrorMsg(error.message);
     } else {
+      // validate passwords match before calling signUp
+      if (formData.password !== formData.confirmPassword) {
+        setPasswordError("Passwords do not match.");
+        return;
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -81,7 +93,13 @@ export default function AuthPage() {
             className={`px-4 py-2 rounded-l ${
               isLogin ? "bg-blue-500 text-white" : "bg-gray-200"
             }`}
-            onClick={() => setIsLogin(true)}
+            onClick={() => {
+              setIsLogin(true);
+              // clear any previous error and confirmPassword when switching modes
+              setErrorMsg("");
+              setFormData((f) => ({ ...f, confirmPassword: "" }));
+              setPasswordError("");
+            }}
           >
             Login
           </button>
@@ -89,7 +107,12 @@ export default function AuthPage() {
             className={`px-4 py-2 rounded-r ${
               !isLogin ? "bg-blue-500 text-white" : "bg-gray-200"
             }`}
-            onClick={() => setIsLogin(false)}
+            onClick={() => {
+              setIsLogin(false);
+              // clear any previous error when switching modes
+              setErrorMsg("");
+              setPasswordError("");
+            }}
           >
             Register
           </button>
@@ -127,9 +150,33 @@ export default function AuthPage() {
             className="w-full border p-2 rounded"
             required
           />
+          {!isLogin && (
+            <>
+              <input
+                type="password"
+                name="confirmPassword"
+                placeholder="Confirm Password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className="w-full border p-2 rounded"
+                required
+              />
+              {passwordError && (
+                <p className="text-red-500 text-sm mt-1">{passwordError}</p>
+              )}
+            </>
+          )}
+
           <button
             type="submit"
-            className="w-full bg-blue-500 text-white p-2 rounded"
+            disabled={
+              !isLogin && formData.password !== formData.confirmPassword
+            }
+            className={`w-full bg-blue-500 text-white p-2 rounded ${
+              !isLogin && formData.password !== formData.confirmPassword
+                ? "opacity-50 cursor-not-allowed"
+                : ""
+            }`}
           >
             {isLogin ? "Login" : "Register"}
           </button>
