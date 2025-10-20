@@ -41,11 +41,31 @@ export default function AuthPage() {
       });
       if (error) setErrorMsg(error.message);
     } else {
-      const { error } = await supabase.auth.signUp({
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
       });
-      if (error) setErrorMsg(error.message);
+
+      if (authError) {
+        setErrorMsg(authError.message);
+        return;
+      }
+
+      // Insert user row (RLS is disabled, so this works)
+      const { error: dbError } = await supabase.from("users").insert([
+        {
+          auth_id: authData.user.id,
+          email: authData.user.email,
+          name: formData.name || null,
+        },
+      ]);
+
+      if (dbError) {
+        setErrorMsg(dbError.message);
+        return;
+      }
+
+      navigate("/dashboard");
     }
   };
 
