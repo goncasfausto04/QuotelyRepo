@@ -5,11 +5,26 @@ import { useNavigate } from "react-router-dom";
 
 export default function Header() {
   const [user, setUser] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get current user
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    // Get current user from Supabase Auth
+    supabase.auth.getUser().then(async ({ data }) => {
+      const authUser = data?.user;
+      setUser(authUser);
+
+      if (authUser) {
+        // Fetch user info from 'users' table
+        const { data: profile, error } = await supabase
+          .from("users")
+          .select("photo_url, name")
+          .eq("auth_id", authUser.id)
+          .single();
+
+        if (!error && profile) setPhotoUrl(profile.photo_url);
+      }
+    });
 
     // Listen for auth changes
     const { data: listener } = supabase.auth.onAuthStateChange(
@@ -26,23 +41,39 @@ export default function Header() {
 
   return (
     <header className="bg-blue-600 text-white p-4 flex justify-between items-center">
-      <h1 className="font-bold text-xl">Quotely</h1>
-      <nav className="flex items-center">
-        <Link className="mr-4" to="/">Home</Link>
+      <Link to="/" className="font-bold text-xl">
+        Quotely
+      </Link>
 
+      <nav className="flex items-center space-x-4">
         {user ? (
           <>
-            <Link className="mr-4" to="/dashboard">Dashboard</Link>
-            <Link className="mr-4" to="/profile">Profile</Link>
-            <button
-              onClick={handleLogout}
-              className="bg-red-500 px-3 py-1 rounded hover:bg-red-600 transition"
-            >
-              Logout
-            </button>
+            <Link to="/dashboard">Dashboard</Link>
+
+            {/* Profile Picture (clickable) */}
+            <div className="flex items-center space-x-2">
+              <Link to="/profile" title={user?.email || "Profile"}>
+                <img
+                  src={
+                    photoUrl ||
+                    "https://ui-avatars.com/api/?background=random&name=" +
+                      encodeURIComponent(user.email || "User")
+                  }
+                  alt={user?.name || user?.email || "User"}
+                  className="w-9 h-9 rounded-full border-2 border-white object-cover cursor-pointer"
+                />
+              </Link>
+
+              <button
+                onClick={handleLogout}
+                className="bg-red-500 px-3 py-1 rounded hover:bg-red-600 transition"
+              >
+                Logout
+              </button>
+            </div>
           </>
         ) : (
-          <Link className="mr-4" to="/auth">Login/Register</Link>
+          <Link to="/auth">Login/Register</Link>
         )}
       </nav>
     </header>
