@@ -71,7 +71,7 @@ export default function Profile() {
         name: userData.name,
         phone: userData.phone,
         location: userData.location,
-        company_id: userData.company_id,
+        company_name: userData.company_name,
         communication_channels,
         budget_ranges,
       })
@@ -123,9 +123,9 @@ export default function Profile() {
           <h2 className="font-semibold mb-2">Profile</h2>
           <input
             type="text"
-            name="company_id"
-            value={userData.company_id || ""}
-            placeholder="Company ID (placeholder)"
+            name="company_name"
+            value={userData.company_name || ""}
+            placeholder="Company Name"
             onChange={handleChange}
             className="w-full border p-2 rounded"
           />
