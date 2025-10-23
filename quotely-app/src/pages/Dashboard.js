@@ -1,6 +1,7 @@
-import BriefingChat from "../components/BriefingChat";
-import QuoteUpload from "../components/QuoteUpload";
-import ComparisonDashboard from "../components/ComparisonDashboard";
+import BriefingChat from "../components/BriefingChat.js";
+import QuoteUpload from "../components/QuoteUpload.js";
+import ComparisonDashboard from "../components/ComparisonDashboard.js";
+import QuoteAnalysis from "./QuoteAnalysis.js";
 
 export default function Dashboard() {
   return (
@@ -9,6 +10,7 @@ export default function Dashboard() {
       <BriefingChat />
       <QuoteUpload />
       <ComparisonDashboard />
+      <QuoteAnalysis />
     </div>
   );
 }

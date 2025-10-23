@@ -1,11 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
-import LandingPage from "./pages/LandingPage";
-import Dashboard from "./pages/Dashboard";
-import Profile from "./pages/Profile";
-import AuthPage from "./pages/AuthPage";
-import ProtectedRoute from "./components/ProtectedRoute";
+import Header from "./components/Header.js";
+import Footer from "./components/Footer.js";
+import LandingPage from "./pages/LandingPage.js";
+import Dashboard from "./pages/Dashboard.js";
+import Profile from "./pages/Profile.js";
+import AuthPage from "./pages/AuthPage.js";
+import ProtectedRoute from "./components/ProtectedRoute.js";
 
 function App() {
   return (
