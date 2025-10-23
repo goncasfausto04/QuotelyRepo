@@ -12,13 +12,13 @@ export default function QuoteAnalysis() {
     setFeedback("");
 
     try {
-      const res = await fetch("/api/analyze-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ emailText: text }),
-      });
+    const res = await fetch("http://localhost:3001/api/analyze-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ emailText: text }),
+    });
 
       const data = await res.json();
 
