@@ -9,13 +9,11 @@ export default function Header() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get current user from Supabase Auth
     supabase.auth.getUser().then(async ({ data }) => {
       const authUser = data?.user;
       setUser(authUser);
 
       if (authUser) {
-        // Fetch user info from 'users' table
         const { data: profile, error } = await supabase
           .from("users")
           .select("photo_url, name")
@@ -26,7 +24,6 @@ export default function Header() {
       }
     });
 
-    // Listen for auth changes
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => setUser(session?.user || null)
     );
@@ -40,42 +37,62 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-blue-600 text-white p-4 flex justify-between items-center">
-      <Link to="/" className="font-bold text-xl">
-        Quotely
-      </Link>
+    <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="max-w-7xl mx-auto flex justify-between items-center">
+        <Link to="/" className="text-2xl font-bold text-blue-500">
+          Quotely
+        </Link>
 
-      <nav className="flex items-center space-x-4">
-        {user ? (
-          <>
-            <Link to="/dashboard">Dashboard</Link>
-
-            {/* Profile Picture (clickable) */}
-            <div className="flex items-center space-x-2">
-              <Link to="/profile" title={user?.email || "Profile"}>
-                <img
-                  src={
-                    photoUrl ||
-                    "https://ui-avatars.com/api/?background=random&name=" +
-                      encodeURIComponent(user.email || "User")
-                  }
-                  alt={user?.name || user?.email || "User"}
-                  className="w-9 h-9 rounded-full border-2 border-white object-cover cursor-pointer"
-                />
+        <nav className="flex items-center gap-6">
+          {user ? (
+            <>
+              <Link
+                to="/dashboard"
+                className="text-gray-700 hover:text-gray-900"
+              >
+                Dashboard
               </Link>
 
-              <button
-                onClick={handleLogout}
-                className="bg-red-500 px-3 py-1 rounded hover:bg-red-600 transition"
+              <div className="flex items-center gap-3">
+                <Link to="/profile" title={user?.email || "Profile"}>
+                  <img
+                    src={
+                      photoUrl ||
+                      "https://ui-avatars.com/api/?background=random&name=" +
+                        encodeURIComponent(user.email || "User")
+                    }
+                    alt={user?.name || user?.email || "User"}
+                    className="w-9 h-9 rounded-full border-2 border-gray-300 object-cover cursor-pointer hover:border-blue-500 transition"
+                  />
+                </Link>
+
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
+                >
+                  Logout
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Dashboard hidden for unauthenticated users */}
+              <Link
+                to="/auth"
+                className="bg-blue-500 text-white px-5 py-2 rounded-md hover:bg-blue-600 transition"
               >
-                Logout
-              </button>
-            </div>
-          </>
-        ) : (
-          <Link to="/auth">Login/Register</Link>
-        )}
-      </nav>
+                Get Started
+              </Link>
+              <Link
+                to="/auth"
+                className="border border-gray-300 text-gray-700 px-5 py-2 rounded-md hover:bg-gray-50 transition"
+              >
+                Sign In
+              </Link>
+            </>
+          )}
+        </nav>
+      </div>
     </header>
   );
 }
