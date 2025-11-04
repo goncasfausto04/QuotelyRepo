@@ -2,230 +2,269 @@ import { useState } from "react";
 
 export default function BriefingChat() {
   const [messages, setMessages] = useState([
-    { role: "AI", content: "Hi! What service do you need a quote for?" },
+    {
+      role: "AI",
+      content: "Hi! What product or service do you need to request quotes for?",
+    },
   ]);
   const [input, setInput] = useState("");
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [initialDescription, setInitialDescription] = useState("");
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
-    // Clear input immediately
-    const userInput = input; // Save the input first
-    setInput(""); // Clear it right away
-
+    const userInput = input.trim();
+    setInput(""); // Clear input immediately
     setIsLoading(true);
-    // Add user message immediately
-    const userMessage = { role: "User", content: userInput }; // Use the saved input
-    setMessages((prev) => [...prev, userMessage]);
 
-    if (questions.length === 0) {
-      // First message - send project description to get questions
-      try {
+    // Add user message to chat
+    setMessages((prev) => [...prev, { role: "User", content: userInput }]);
+
+    try {
+      if (questions.length === 0) {
+        // STEP 1: User provides initial description
+        setInitialDescription(userInput); // Save for later
+
         const response = await fetch("http://localhost:3001/start", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ description: input }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ description: userInput }),
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Received questions from backend:", data.questions);
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
 
-          if (!data.questions || data.questions.length === 0) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "AI",
-                content: "Error: No questions received from the server.",
-              },
-            ]);
-            setIsLoading(false);
-            return;
-          }
+        const data = await response.json();
 
-          // Filter out any empty or invalid questions
-          const validQuestions = data.questions.filter(
-            (q) =>
-              q &&
-              q.trim().length > 0 &&
-              !q.includes("great start") &&
-              !q.includes("personalized questions")
-          );
-
-          if (validQuestions.length === 0) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "AI",
-                content:
-                  "Error: Could not generate valid questions. Please try again.",
-              },
-            ]);
-            setIsLoading(false);
-            return;
-          }
-
-          // Set questions and show the first one
-          setQuestions(validQuestions);
+        if (!data.questions || data.questions.length === 0) {
           setMessages((prev) => [
             ...prev,
             {
               role: "AI",
               content:
-                data.message ||
-                "Great! I have some questions to better understand your needs:",
+                "I couldn't generate questions. Please try rephrasing your request.",
             },
-            { role: "AI", content: `1. ${validQuestions[0]}` }, // Show first question immediately
           ]);
-          setCurrentQuestionIndex(1); // Next question index
-        } else {
-          const errorData = await response.json();
+          setIsLoading(false);
+          return;
+        }
+
+        // Filter and validate questions
+        const validQuestions = data.questions.filter(
+          (q) =>
+            q &&
+            typeof q === "string" &&
+            q.trim().length > 10 &&
+            q.includes("?")
+        );
+
+        if (validQuestions.length === 0) {
           setMessages((prev) => [
             ...prev,
-            { role: "AI", content: `Error: ${errorData.error}` },
+            {
+              role: "AI",
+              content:
+                "Sorry, I had trouble understanding. Could you describe what you need more specifically?",
+            },
           ]);
+          setIsLoading(false);
+          return;
         }
-      } catch (error) {
+
+        setQuestions(validQuestions);
         setMessages((prev) => [
           ...prev,
-          { role: "AI", content: `Error: ${error.message}` },
+          {
+            role: "AI",
+            content:
+              data.message ||
+              "Perfect! I have some questions to help create your quote request:",
+          },
+          { role: "AI", content: `Question 1: ${validQuestions[0]}` },
         ]);
-      }
-    } else {
-      // Handle user answers to the generated questions
-      const newAnswers = [...answers, input];
-      setAnswers(newAnswers);
+        setCurrentQuestionIndex(1);
+      } else {
+        // STEP 2: User answers questions
+        const newAnswers = [...answers, userInput];
+        setAnswers(newAnswers);
 
-      console.log(
-        `Answer ${newAnswers.length} of ${questions.length} questions`
-      );
-
-      // Check if all questions are answered
-      if (currentQuestionIndex >= questions.length) {
-        // All questions answered - generate briefing
-        try {
+        if (currentQuestionIndex >= questions.length) {
+          // STEP 3: All questions answered - generate email
           setMessages((prev) => [
             ...prev,
             {
               role: "AI",
               content:
-                "Thank you for answering all the questions! Generating your briefing document...",
+                "Perfect! Let me create a professional quote request email for you...",
             },
           ]);
 
           const response = await fetch("http://localhost:3001/compose-email", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ answers: newAnswers }),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              answers: newAnswers,
+              initialDescription: initialDescription,
+            }),
           });
 
-
-          if (response.ok) {
-            const data = await response.json();
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "AI",
-                content: "Here's your generated supplier email draft:",
-              },
-              { role: "AI", content: data.email },
-            ]);
-
-            // Reset for new conversation (optional)
-            setQuestions([]);
-            setAnswers([]);
-            setCurrentQuestionIndex(0);
-          } else {
-            const errorData = await response.json();
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "AI",
-                content: `Error generating your email: ${errorData.error}, try again later may be the api that sucks.`,
-              },
-            ]);
+          if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
           }
-        } catch (error) {
+
+          const data = await response.json();
+
           setMessages((prev) => [
             ...prev,
-            { role: "AI", content: `Error: ${error.message}` },
+            {
+              role: "AI",
+              content: "✅ Here's your professional quote request email:",
+            },
+            {
+              role: "Email",
+              content: data.email,
+              isEmail: true, // Flag for special styling
+            },
+            {
+              role: "AI",
+              content:
+                "You can copy this email and send it to your suppliers. Need another quote request? Just tell me what you need!",
+            },
           ]);
-        }
-      } else {
-        // Show next question
-        const nextQuestion = questions[currentQuestionIndex];
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "AI",
-            content: `${currentQuestionIndex + 1}. ${nextQuestion}`,
-          },
-        ]);
-        setCurrentQuestionIndex((prev) => prev + 1);
-      }
-    }
 
-    setIsLoading(false);
+          // Reset for new conversation
+          setQuestions([]);
+          setAnswers([]);
+          setCurrentQuestionIndex(0);
+          setInitialDescription("");
+        } else {
+          // Show next question
+          const nextQuestion = questions[currentQuestionIndex];
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "AI",
+              content: `Question ${currentQuestionIndex + 1}: ${nextQuestion}`,
+            },
+          ]);
+          setCurrentQuestionIndex((prev) => prev + 1);
+        }
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "AI",
+          content: `❌ Something went wrong: ${error.message}. Please try again.`,
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
       sendMessage();
     }
   };
 
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    alert("Email copied to clipboard!");
+  };
+
   return (
-    <div className="max-w-2xl mx-auto p-4 border rounded-lg shadow-lg mt-4">
-      <h2 className="text-xl font-bold mb-4">AI-Guided Briefing</h2>
-      <div className="mb-4 h-64 overflow-y-auto border p-2 rounded">
+    <div className="max-w-3xl mx-auto p-6 border rounded-lg shadow-lg mt-8 bg-white">
+      <h2 className="text-2xl font-bold mb-2">📧 Quote Request Assistant</h2>
+      <p className="text-gray-600 text-sm mb-4">
+        Tell me what you need, and I'll help you create a professional quote
+        request email
+      </p>
+
+      <div className="mb-4 h-96 overflow-y-auto border rounded p-4 bg-gray-50">
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`my-1 p-2 rounded ${
+            className={`my-2 p-3 rounded-lg ${
               msg.role === "AI"
-                ? "bg-blue-100 text-blue-900"
-                : "bg-gray-100 text-gray-900"
+                ? "bg-blue-50 text-blue-900 border-l-4 border-blue-400"
+                : msg.role === "Email"
+                ? "bg-green-50 text-gray-900 border border-green-300 font-mono text-sm whitespace-pre-wrap"
+                : "bg-white text-gray-900 border border-gray-200 ml-8"
             }`}
           >
-            <strong>{msg.role}: </strong> {msg.content}
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <strong className="text-xs uppercase tracking-wide">
+                  {msg.role}:
+                </strong>
+                <div className="mt-1">{msg.content}</div>
+              </div>
+              {msg.isEmail && (
+                <button
+                  onClick={() => copyToClipboard(msg.content)}
+                  className="ml-2 px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  Copy
+                </button>
+              )}
+            </div>
           </div>
         ))}
-        {/* Loading indicator */}
+
         {isLoading && (
-          <div className="my-1 p-2 rounded bg-blue-100 text-blue-900">
-            <strong>AI: </strong>
-            <span className="italic">Thinking...</span>
+          <div className="my-2 p-3 rounded-lg bg-blue-50 text-blue-900">
+            <strong className="text-xs">AI:</strong>
+            <div className="mt-1 flex items-center gap-2">
+              <div className="animate-pulse">Thinking...</div>
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                <div
+                  className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                  style={{ animationDelay: "0.1s" }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                  style={{ animationDelay: "0.2s" }}
+                ></div>
+              </div>
+            </div>
           </div>
         )}
       </div>
-      <div className="flex">
+
+      <div className="flex gap-2">
         <input
-          className="flex-1 border rounded-l p-2"
+          className="flex-1 border-2 border-gray-300 rounded-lg p-3 focus:border-blue-500 focus:outline-none"
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder={
-            isLoading ? "Please wait..." : "Type your message here..."
+            isLoading
+              ? "Please wait..."
+              : questions.length === 0
+              ? "e.g., I need 100 custom t-shirts with my logo"
+              : "Type your answer..."
           }
           disabled={isLoading}
         />
         <button
-          className={`p-2 rounded-r ${
-            isLoading
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-500 hover:bg-blue-600"
-          } text-white`}
+          className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+            isLoading || !input.trim()
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : "bg-blue-600 text-white hover:bg-blue-700"
+          }`}
           onClick={sendMessage}
-          disabled={isLoading}
+          disabled={isLoading || !input.trim()}
         >
           {isLoading ? "..." : "Send"}
         </button>

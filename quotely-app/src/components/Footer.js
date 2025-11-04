@@ -1,30 +1,15 @@
 export default function Footer() {
   const useCases = [
-    "UI design",
-    "UX design",
-    "Wireframing",
-    "Diagramming",
-    "Brainstorming",
-    "Online whiteboard",
-    "Team collaboration",
+    "Placeholder text",
+    "Placeholder text",
   ];
   const explore = [
-    "Design",
-    "Prototyping",
-    "Development features",
-    "Design systems",
-    "Collaboration features",
-    "Design process",
-    "FigJam",
+    "Placeholder text",
+    "Placeholder text",
   ];
   const resources = [
-    "Blog",
-    "Best practices",
-    "Colors",
-    "Color wheel",
-    "Support",
-    "Developers",
-    "Resource library",
+    "Placeholder text",
+    "Placeholder text",
   ];
 
   return (
