@@ -119,23 +119,24 @@ export default function BriefingChat() {
             },
           ]);
 
-          const response = await fetch("http://localhost:3001/briefing", {
+          const response = await fetch("http://localhost:3001/compose-email", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              answers: newAnswers,
-              approved: true,
-            }),
+            body: JSON.stringify({ answers: newAnswers }),
           });
+
 
           if (response.ok) {
             const data = await response.json();
             setMessages((prev) => [
               ...prev,
-              { role: "AI", content: "Here is your briefing document:" },
-              { role: "AI", content: data.briefing },
+              {
+                role: "AI",
+                content: "Here's your generated supplier email draft:",
+              },
+              { role: "AI", content: data.email },
             ]);
 
             // Reset for new conversation (optional)
@@ -148,7 +149,7 @@ export default function BriefingChat() {
               ...prev,
               {
                 role: "AI",
-                content: `Error generating briefing: ${errorData.error}`,
+                content: `Error generating your email: ${errorData.error}, try again later may be the api that sucks.`,
               },
             ]);
           }

@@ -90,42 +90,41 @@ Return **only** the JSON output. No preamble, no explanation.`,
   }
 });
 
-// --- ROUTE 2: Project Briefing Questions ---
-const generateQuestions = async (userDescription) => {
+// --- ROUTE 2: Project (Procurement) Question Generation ---
+const generateProcurementQuestions = async (userDescription) => {
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: `
-You are an expert project discovery assistant.
+You are an assistant helping a user **compose an inquiry email to a supplier or service provider**.
 
-Your job is to analyze this project description and generate exactly **8 targeted questions** that will help gather complete technical and business requirements.
+Based on the short description below, ask the most relevant and specific **questions** you need in order to write a complete, professional email.  
 
-🧭 **GUIDELINES**
-- The questions should be **clear**, **non-redundant**, and **specific** to the provided description.
-- Avoid generic fluff like “What's your budget?” unless relevant.
-- Cover key areas such as: scope, functionality, design, integrations, timelines, target audience, success criteria, and constraints.
-- Do not repeat or rephrase similar questions.
+✅ **Rules for generating questions:**
+- Ask **only questions necessary** to understand what the user wants to request.
+- Focus on key aspects such as: type of product/service, specifications, quantity, brand/model, delivery or pickup, timeline, budget, and contact preferences.
+- Keep each question **concise and conversational**, as if you’re chatting.
+- Avoid repeating or rephrasing questions.
+- Ask between **5–8 questions** maximum.
 
-Return output as a **valid JSON array of 8 strings only**, e.g.:
-["Question 1?", "Question 2?", "Question 3?", ...]
+Return output as a **valid JSON array** of questions like:
+["Question 1?", "Question 2?", "Question 3?"]
 
-Project Description:
+📝 User’s request:
 "${userDescription}"
 
-Return only the JSON array. No markdown, no comments, no text outside the array.`,
+Return only the JSON array — no other text.`,
   });
 
   let questions;
   try {
     const jsonMatch = response.text.match(/\[.*\]/s);
-    if (jsonMatch) {
-      questions = JSON.parse(jsonMatch[0]);
-    } else throw new Error("No JSON array found");
+    if (jsonMatch) questions = JSON.parse(jsonMatch[0]);
+    else throw new Error("No JSON found");
   } catch {
-    // fallback if JSON parsing fails
     questions = response.text
       .split("\n")
-      .filter((line) => line.trim() && line.includes("?"))
-      .map((line) => line.replace(/^\d+\.\s*/, "").trim())
+      .filter((q) => q.trim().endsWith("?"))
+      .map((q) => q.trim())
       .slice(0, 8);
   }
 
@@ -135,67 +134,57 @@ Return only the JSON array. No markdown, no comments, no text outside the array.
 app.post("/start", async (req, res) => {
   const { description } = req.body;
   if (!description?.trim())
-    return res.status(400).json({ error: "Project description is required" });
+    return res.status(400).json({ error: "Description is required" });
 
   try {
-    const questions = await generateQuestions(description);
+    const questions = await generateProcurementQuestions(description);
     res.json({
-      message:
-        "Hello! I'm here to assist you. Please answer the following questions to proceed.",
+      message: "Let's get some details so I can help you write the perfect inquiry email.",
       questions,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    console.error("Error generating questions:", error);
+    res.status(500).json({ error: "Failed to generate questions" });
   }
 });
 
-// --- ROUTE 3: Briefing Creation ---
-const generateBriefingWithEstimates = async (answers) => {
+// --- ROUTE 3: Email Composition ---
+const generateSupplierEmail = async (answers) => {
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: `
-You are a professional project analyst.
+You are a professional assistant that writes **inquiry emails to suppliers or workshops**, helping a user compose an email.
 
-Based on the following set of client answers, create a **concise and professional project briefing document** with realistic **cost** and **timeline estimates**.
+The user has provided the following answers to your questions:
+${answers.map((a, i) => `Q${i + 1}: ${a}`).join("\n")}
 
-🧩 **REQUIREMENTS**
-- Structure the briefing clearly with headings and sections.
-- Include: *Project Summary, Objectives, Scope, Deliverables, Technical Requirements, Timeline Estimate, Cost Estimate, and Risks/Notes.*
-- Write in a **neutral, professional tone**.
-- Be specific when possible (e.g., “Estimated 4-6 weeks for MVP” rather than “a few weeks”).
-- If any critical details are missing, infer reasonable assumptions and mention them in “Notes”.
-- Return the final output formatted in Markdown with clear section headings (no code blocks, no JSON, no metadata).
+✉️ Write a short, clear, and polite **email to the supplier** that includes all relevant details for the request.
+- Use a professional and friendly tone.
+- Make it sound natural (as if written by a person, not AI).
+- Include all key info: specifications, quantities, preferences, delivery or timing, etc.
+- End with a clear call to action (e.g., “Please confirm availability and send a quote.”).
+- Do not include placeholders or notes to the user.
 
-Client Answers:
-${answers.map((a) => a.trim()).join(" | ")}
-
-Generate the briefing document now.`,
+📬 Return only the plain email text — no markdown, no JSON, no explanation.`,
   });
 
-  return response.text;
+  return response.text.trim();
 };
 
-app.post("/briefing", async (req, res) => {
-  const { answers, approved } = req.body;
-
-  if (!answers) return res.status(400).json({ error: "Answers are required" });
-
-  if (!approved) {
-    return res.json({
-      message:
-        "Briefing is pending approval. Estimates will be generated after approval.",
-    });
-  }
+app.post("/compose-email", async (req, res) => {
+  const { answers } = req.body;
+  if (!answers || !Array.isArray(answers))
+    return res.status(400).json({ error: "Answers array is required" });
 
   try {
-    const briefing = await generateBriefingWithEstimates(answers);
-    res.json({ briefing });
+    const email = await generateSupplierEmail(answers);
+    res.json({ email });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    console.error("Error generating email:", error);
+    res.status(500).json({ error: "Failed to generate email" });
   }
 });
+
 
 // --- Start unified server ---
 const PORT = process.env.PORT || 3001;
