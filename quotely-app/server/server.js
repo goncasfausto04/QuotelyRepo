@@ -122,47 +122,60 @@ OUTPUT (valid JSON only):`,
   }
 });
 
-// --- ROUTE 2: Generate Questions for RFQ ---
+// --- ROUTE 2: Generate Questions for RFQ (Smarter Conversation Flow) ---
 app.post("/start", async (req, res) => {
-  const { description } = req.body;
+  const { description, previousAnswer } = req.body;
 
   if (!description?.trim()) {
     return res.status(400).json({ error: "Description is required" });
   }
 
+  // 🔍 Detect unclear or off-topic answers before hitting the model
+  const unclearPatterns = [
+    /what do you mean/i,
+    /not sure/i,
+    /idk/i,
+    /no idea/i,
+    /huh/i,
+    /can you explain/i,
+  ];
+
+  if (previousAnswer && unclearPatterns.some((r) => r.test(previousAnswer))) {
+    return res.json({
+      message:
+        "No worries! I just meant — can you describe briefly what kind of product or service you're looking for?",
+      questions: ["What kind of product or service do you need?"],
+    });
+  }
+
   try {
-    console.log("📝 Generating questions for:", description);
+    console.log("📝 Generating smarter questions for:", description);
 
     const response = await retryWithBackoff(async () => {
       return await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: `You are helping a buyer create a quote request email to send to suppliers.
+        contents: `
+You are an intelligent assistant helping a buyer prepare a quote request for suppliers.
 
-The buyer said: "${description}"
+USER INPUT:
+"${description}"
 
-Generate exactly 6-8 specific questions to gather the information needed to write a complete quote request email.
-
-QUESTION FOCUS AREAS (ask only what's relevant and not already mentioned):
-- Exact product/service specifications (size, color, material, model, technical details)
-- Quantity needed
-- Quality requirements or certifications
-- Delivery timeline (when do they need it?)
-- Delivery location (where should it be shipped?)
-- Budget range (if they have one)
-- Payment preferences
-- Any special requirements
+YOUR TASK:
+1. Generate 6–8 specific questions to gather all info needed for a quote request.
+2. If any user answer seems vague or unclear, you must clarify it instead of skipping ahead.
+3. Each question should be focused, conversational, and professional.
 
 RULES:
-- Be specific and conversational
-- Don't ask about information already clearly stated
-- Keep questions short and clear
-- Each question should gather ONE key piece of info
-- Return EXACTLY between 6-8 questions
+- Ask ONE thing per question.
+- Be friendly but efficient.
+- Avoid repeating info already mentioned by the user.
+- Assume you’re talking to a human — use natural phrasing.
 
-Output as a valid JSON array:
+RETURN FORMAT:
+A valid JSON array, e.g.:
 ["Question 1?", "Question 2?", "Question 3?"]
 
-Return ONLY the JSON array, nothing else.`,
+OUTPUT ONLY THE JSON ARRAY.`,
       });
     });
 
@@ -176,49 +189,40 @@ Return ONLY the JSON array, nothing else.`,
         questions = JSON.parse(jsonMatch[0]);
       }
     } catch (parseError) {
-      console.log("⚠️  JSON parse failed, using fallback extraction");
+      console.log("⚠️ JSON parse failed, using fallback extraction");
     }
 
     if (!questions.length) {
       questions = response.text
         .split("\n")
         .map((line) => line.trim())
-        .filter((line) => {
-          return (
-            line.length > 15 &&
-            line.includes("?") &&
-            !line.toLowerCase().startsWith("here") &&
-            !line.toLowerCase().startsWith("sure") &&
-            !line.toLowerCase().includes("json")
-          );
-        })
-        .map((line) => {
-          return line
+        .filter((line) => line.includes("?") && line.length > 10)
+        .map((line) =>
+          line
             .replace(/^\d+[\.\)]\s*/, "")
             .replace(/^[-*]\s*/, "")
             .replace(/["']/g, "")
-            .replace(/\*\*/g, "")
-            .trim();
-        });
+            .trim()
+        );
     }
 
-    questions = questions.slice(0, 8);
-
-    const fallbackQuestions = [
-      "What specific product or service do you need?",
-      "What quantity do you need?",
-      "When do you need it delivered?",
-      "Where should it be delivered?",
-      "Do you have any specific quality or technical requirements?",
-      "What is your budget range for this?",
-      "Do you have any preferred brands or specifications?",
-      "Are there any other important details I should include?",
-    ];
-
-    while (questions.length < 6) {
-      const fallback = fallbackQuestions[questions.length];
-      if (fallback && !questions.includes(fallback)) {
-        questions.push(fallback);
+    // Fallback if model gives junk
+    if (questions.length < 6) {
+      const fallbackQuestions = [
+        "What specific product or service do you need?",
+        "What quantity do you need?",
+        "When do you need it delivered?",
+        "Where should it be delivered?",
+        "Do you have any specific quality or technical requirements?",
+        "What is your budget range for this?",
+        "Do you have preferred brands or suppliers?",
+        "Any other important details I should include?",
+      ];
+      while (questions.length < 6) {
+        const fallback = fallbackQuestions[questions.length];
+        if (fallback && !questions.includes(fallback)) {
+          questions.push(fallback);
+        }
       }
     }
 
@@ -227,19 +231,20 @@ Return ONLY the JSON array, nothing else.`,
     res.json({
       message:
         "Great! Let me ask you a few questions to create the perfect quote request:",
-      questions: questions,
+      questions,
     });
   } catch (error) {
     console.error("❌ Error generating questions:", error);
     res.status(500).json({
       error:
         error.status === 503
-          ? "AI service is temporarily overloaded. Please try again in a moment."
+          ? "AI service is temporarily overloaded. Please try again later."
           : "Failed to generate questions",
       details: error.message,
     });
   }
 });
+
 
 // --- ROUTE 3: Generate Quote Request Email ---
 app.post("/compose-email", async (req, res) => {

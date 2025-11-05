@@ -13,32 +13,32 @@ export default function BriefingChat() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [initialDescription, setInitialDescription] = useState("");
+  const [lastAnswer, setLastAnswer] = useState(""); // 👈 new: keep last user input
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
     const userInput = input.trim();
-    setInput(""); // Clear input immediately
+    setInput("");
     setIsLoading(true);
-
-    // Add user message to chat
     setMessages((prev) => [...prev, { role: "User", content: userInput }]);
+    setLastAnswer(userInput);
 
     try {
+      // --- STEP 1: First message (no questions yet) ---
       if (questions.length === 0) {
-        // STEP 1: User provides initial description
-        setInitialDescription(userInput); // Save for later
+        setInitialDescription(userInput);
 
         const response = await fetch("http://localhost:3001/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ description: userInput }),
+          body: JSON.stringify({
+            description: userInput,
+            previousAnswer: "", // first message, so none yet
+          }),
         });
 
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
-        }
-
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
         const data = await response.json();
 
         if (!data.questions || data.questions.length === 0) {
@@ -54,13 +54,9 @@ export default function BriefingChat() {
           return;
         }
 
-        // Filter and validate questions
         const validQuestions = data.questions.filter(
           (q) =>
-            q &&
-            typeof q === "string" &&
-            q.trim().length > 10 &&
-            q.includes("?")
+            typeof q === "string" && q.trim().length > 10 && q.includes("?")
         );
 
         if (validQuestions.length === 0) {
@@ -88,13 +84,38 @@ export default function BriefingChat() {
           { role: "AI", content: `Question 1: ${validQuestions[0]}` },
         ]);
         setCurrentQuestionIndex(1);
-      } else {
-        // STEP 2: User answers questions
+      }
+
+      // --- STEP 2: Follow-up answers ---
+      else {
         const newAnswers = [...answers, userInput];
         setAnswers(newAnswers);
 
+        // 🧠 Call /start again with last answer for clarification logic
+        const response = await fetch("http://localhost:3001/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            description: initialDescription,
+            previousAnswer: userInput,
+          }),
+        });
+
+        const data = await response.json();
+
+        // If clarification triggered (single question only)
+        if (data.questions && data.questions.length === 1) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "AI", content: data.message },
+            { role: "AI", content: data.questions[0] },
+          ]);
+          setIsLoading(false);
+          return;
+        }
+
+        // --- If user finished all questions ---
         if (currentQuestionIndex >= questions.length) {
-          // STEP 3: All questions answered - generate email
           setMessages((prev) => [
             ...prev,
             {
@@ -104,20 +125,18 @@ export default function BriefingChat() {
             },
           ]);
 
-          const response = await fetch("http://localhost:3001/compose-email", {
+          const emailRes = await fetch("http://localhost:3001/compose-email", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               answers: newAnswers,
-              initialDescription: initialDescription,
+              initialDescription,
             }),
           });
 
-          if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
-          }
+          if (!emailRes.ok) throw new Error(`Server error: ${emailRes.status}`);
 
-          const data = await response.json();
+          const emailData = await emailRes.json();
 
           setMessages((prev) => [
             ...prev,
@@ -127,8 +146,8 @@ export default function BriefingChat() {
             },
             {
               role: "Email",
-              content: data.email,
-              isEmail: true, // Flag for special styling
+              content: emailData.email,
+              isEmail: true,
             },
             {
               role: "AI",
@@ -137,13 +156,14 @@ export default function BriefingChat() {
             },
           ]);
 
-          // Reset for new conversation
+          // reset convo
           setQuestions([]);
           setAnswers([]);
           setCurrentQuestionIndex(0);
           setInitialDescription("");
+          setLastAnswer("");
         } else {
-          // Show next question
+          // --- Ask next question normally ---
           const nextQuestion = questions[currentQuestionIndex];
           setMessages((prev) => [
             ...prev,
