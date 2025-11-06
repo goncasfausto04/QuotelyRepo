@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Header from "./components/Header.js";
 import Footer from "./components/Footer.js";
 import LandingPage from "./pages/LandingPage.js";
-import Dashboard from "./pages/Dashboard.js";
+import BriefingPage from "./pages/BriefingPage.js";
 import Profile from "./pages/Profile.js";
 import AuthPage from "./pages/AuthPage.js";
 import ProtectedRoute from "./components/ProtectedRoute.js";
@@ -17,15 +17,15 @@ function App() {
 
         {/* Protected Routes */}
         <Route
-          path="/dashboard"
+          path="/briefingpage"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <BriefingPage />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/dashboard/briefings"
+          path="/briefings"
           element={
             <ProtectedRoute>
               <Briefings />

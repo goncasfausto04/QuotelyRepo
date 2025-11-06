@@ -47,10 +47,10 @@ export default function Header() {
           {user ? (
             <>
               <Link
-                to="/dashboard"
+                to="/briefings"
                 className="text-gray-700 hover:text-gray-900"
               >
-                Dashboard
+                Briefings
               </Link>
 
               <div className="flex items-center gap-3">
@@ -76,7 +76,7 @@ export default function Header() {
             </>
           ) : (
             <>
-              {/* Dashboard hidden for unauthenticated users */}
+              {/* BriefingPage hidden for unauthenticated users */}
               <Link
                 to="/auth"
                 className="bg-blue-500 text-white px-5 py-2 rounded-md hover:bg-blue-600 transition"

@@ -39,7 +39,7 @@ export default function LandingPage() {
             {user ? (
               // Logged in: Show Create Briefing button
               <Link
-                to="/dashboard"
+                to="/briefings"
                 className="bg-blue-500 text-white px-6 py-3 rounded-md hover:bg-blue-600 transition flex items-center gap-2 font-medium"
               >
                 Create Briefing <ArrowRight size={20} />
@@ -48,7 +48,7 @@ export default function LandingPage() {
               // Not logged in: Show Start Free Trial and Sign In
               <>
                 <Link
-                  to="/dashboard"
+                  to="/briefings"
                   className="bg-blue-500 text-white px-6 py-3 rounded-md hover:bg-blue-600 transition flex items-center gap-2 font-medium"
                 >
                   Start Free Trial <ArrowRight size={20} />

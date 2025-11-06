@@ -17,12 +17,12 @@ export default function AuthPage() {
   // Redirect if already logged in
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate("/dashboard");
+      if (data.user) navigate("/briefings");
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        if (session?.user) navigate("/dashboard");
+        if (session?.user) navigate("/briefings");
       }
     );
 
@@ -77,7 +77,7 @@ export default function AuthPage() {
         return;
       }
 
-      navigate("/dashboard");
+      navigate("/briefings");
     }
   };
 
