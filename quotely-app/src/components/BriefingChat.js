@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../supabaseClient.js";
 
-export default function BriefingChat() {
+export default function BriefingChat({ briefingId: initialBriefingId }) {
+  const [briefingId, setBriefingId] = useState(initialBriefingId || null);
   const [messages, setMessages] = useState([
     {
       role: "AI",
@@ -13,7 +15,60 @@ export default function BriefingChat() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [initialDescription, setInitialDescription] = useState("");
-  const [lastAnswer, setLastAnswer] = useState(""); // 👈 new: keep last user input
+  const [lastAnswer, setLastAnswer] = useState("");
+
+  // ✅ Auto-create or load briefing record
+  useEffect(() => {
+    const initBriefing = async () => {
+      if (initialBriefingId) {
+        // Load existing chat
+        const { data, error } = await supabase
+          .from("briefings")
+          .select("chat")
+          .eq("id", initialBriefingId)
+          .single();
+
+        if (!error && data && data.chat?.length > 0) {
+          setMessages(data.chat);
+        }
+        setBriefingId(initialBriefingId);
+      } else {
+        // Create new briefing
+        const { data, error } = await supabase
+          .from("briefings")
+          .insert([{ title: "New Briefing", status: "draft" }])
+          .select()
+          .single();
+
+        if (error) {
+          console.error("Error creating briefing:", error.message);
+        } else {
+          setBriefingId(data.id);
+        }
+      }
+    };
+
+    initBriefing();
+  }, [initialBriefingId]);
+
+  // ✅ Save chat messages to Supabase
+  const saveChatToSupabase = async (newMessages) => {
+    if (!briefingId) return;
+    const { error } = await supabase
+      .from("briefings")
+      .update({ chat: newMessages })
+      .eq("id", briefingId);
+
+    if (error) console.error("Error saving chat:", error.message);
+  };
+
+  const appendMessage = (newMsg) => {
+    setMessages((prev) => {
+      const updated = [...prev, newMsg];
+      saveChatToSupabase(updated);
+      return updated;
+    });
+  };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -21,7 +76,7 @@ export default function BriefingChat() {
     const userInput = input.trim();
     setInput("");
     setIsLoading(true);
-    setMessages((prev) => [...prev, { role: "User", content: userInput }]);
+    appendMessage({ role: "User", content: userInput });
     setLastAnswer(userInput);
 
     try {
@@ -34,7 +89,7 @@ export default function BriefingChat() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             description: userInput,
-            previousAnswer: "", // first message, so none yet
+            previousAnswer: "",
           }),
         });
 
@@ -42,14 +97,11 @@ export default function BriefingChat() {
         const data = await response.json();
 
         if (!data.questions || data.questions.length === 0) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "AI",
-              content:
-                "I couldn't generate questions. Please try rephrasing your request.",
-            },
-          ]);
+          appendMessage({
+            role: "AI",
+            content:
+              "I couldn't generate questions. Please try rephrasing your request.",
+          });
           setIsLoading(false);
           return;
         }
@@ -60,29 +112,26 @@ export default function BriefingChat() {
         );
 
         if (validQuestions.length === 0) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "AI",
-              content:
-                "Sorry, I had trouble understanding. Could you describe what you need more specifically?",
-            },
-          ]);
+          appendMessage({
+            role: "AI",
+            content:
+              "Sorry, I had trouble understanding. Could you describe what you need more specifically?",
+          });
           setIsLoading(false);
           return;
         }
 
         setQuestions(validQuestions);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "AI",
-            content:
-              data.message ||
-              "Perfect! I have some questions to help create your quote request:",
-          },
-          { role: "AI", content: `Question 1: ${validQuestions[0]}` },
-        ]);
+        appendMessage({
+          role: "AI",
+          content:
+            data.message ||
+            "Perfect! I have some questions to help create your quote request:",
+        });
+        appendMessage({
+          role: "AI",
+          content: `Question 1: ${validQuestions[0]}`,
+        });
         setCurrentQuestionIndex(1);
       }
 
@@ -91,7 +140,6 @@ export default function BriefingChat() {
         const newAnswers = [...answers, userInput];
         setAnswers(newAnswers);
 
-        // 🧠 Call /start again with last answer for clarification logic
         const response = await fetch("http://localhost:3001/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -105,25 +153,19 @@ export default function BriefingChat() {
 
         // If clarification triggered (single question only)
         if (data.questions && data.questions.length === 1) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "AI", content: data.message },
-            { role: "AI", content: data.questions[0] },
-          ]);
+          appendMessage({ role: "AI", content: data.message });
+          appendMessage({ role: "AI", content: data.questions[0] });
           setIsLoading(false);
           return;
         }
 
-        // --- If user finished all questions ---
+        // --- If finished all questions ---
         if (currentQuestionIndex >= questions.length) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "AI",
-              content:
-                "Perfect! Let me create a professional quote request email for you...",
-            },
-          ]);
+          appendMessage({
+            role: "AI",
+            content:
+              "Perfect! Let me create a professional quote request email for you...",
+          });
 
           const emailRes = await fetch("http://localhost:3001/compose-email", {
             method: "POST",
@@ -138,52 +180,42 @@ export default function BriefingChat() {
 
           const emailData = await emailRes.json();
 
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "AI",
-              content: "✅ Here's your professional quote request email:",
-            },
-            {
-              role: "Email",
-              content: emailData.email,
-              isEmail: true,
-            },
-            {
-              role: "AI",
-              content:
-                "You can copy this email and send it to your suppliers. Need another quote request? Just tell me what you need!",
-            },
-          ]);
+          appendMessage({
+            role: "AI",
+            content: "✅ Here's your professional quote request email:",
+          });
+          appendMessage({
+            role: "Email",
+            content: emailData.email,
+            isEmail: true,
+          });
+          appendMessage({
+            role: "AI",
+            content:
+              "You can copy this email and send it to your suppliers. Need another quote request? Just tell me what you need!",
+          });
 
-          // reset convo
+          // Reset convo
           setQuestions([]);
           setAnswers([]);
           setCurrentQuestionIndex(0);
           setInitialDescription("");
           setLastAnswer("");
         } else {
-          // --- Ask next question normally ---
           const nextQuestion = questions[currentQuestionIndex];
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "AI",
-              content: `Question ${currentQuestionIndex + 1}: ${nextQuestion}`,
-            },
-          ]);
+          appendMessage({
+            role: "AI",
+            content: `Question ${currentQuestionIndex + 1}: ${nextQuestion}`,
+          });
           setCurrentQuestionIndex((prev) => prev + 1);
         }
       }
     } catch (error) {
       console.error("Error:", error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "AI",
-          content: `❌ Something went wrong: ${error.message}. Please try again.`,
-        },
-      ]);
+      appendMessage({
+        role: "AI",
+        content: `❌ Something went wrong: ${error.message}. Please try again.`,
+      });
     } finally {
       setIsLoading(false);
     }
