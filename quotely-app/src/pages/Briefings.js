@@ -1,35 +1,36 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { FileText, Plus, Eye, Edit, Trash2 } from "lucide-react";
+import { supabase } from "../supabaseClient.js";
+import { useEffect, useState } from "react";
+
 
 const Briefings = () => {
   // Sample data - will be replaced with real data later
-  const briefings = [
-    {
-      id: 1,
-      title: "Office Renovation",
-      status: "active",
-      createdAt: "2024-01-15",
-      quotesReceived: 3,
-      category: "Construction",
-    },
-    {
-      id: 2,
-      title: "Website Development",
-      status: "draft",
-      createdAt: "2024-01-20",
-      quotesReceived: 0,
-      category: "IT Services",
-    },
-    {
-      id: 3,
-      title: "Marketing Campaign",
-      status: "completed",
-      createdAt: "2024-01-10",
-      quotesReceived: 5,
-      category: "Marketing",
-    },
-  ];
+
+  const [briefings, setBriefings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchBriefings = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("briefings")
+        .select("*")
+        .eq("user_auth_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) console.error("Error fetching briefings:", error);
+      else setBriefings(data);
+      setLoading(false);
+    };
+
+    fetchBriefings();
+  }, []);
 
   const getStatusColor = (status) => {
     switch (status) {

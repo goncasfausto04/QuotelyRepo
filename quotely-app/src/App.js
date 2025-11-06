@@ -7,6 +7,7 @@ import Profile from "./pages/Profile.js";
 import AuthPage from "./pages/AuthPage.js";
 import ProtectedRoute from "./components/ProtectedRoute.js";
 import Briefings from "./pages/Briefings.js";
+import CreateBriefing from "./pages/CreateBriefing.js";
 
 function App() {
   return (
@@ -37,6 +38,15 @@ function App() {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/briefings/create-briefing"
+          element={
+            <ProtectedRoute>
+              <CreateBriefing />
             </ProtectedRoute>
           }
         />
