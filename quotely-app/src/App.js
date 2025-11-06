@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard.js";
 import Profile from "./pages/Profile.js";
 import AuthPage from "./pages/AuthPage.js";
 import ProtectedRoute from "./components/ProtectedRoute.js";
+import Briefings from "./pages/Briefings.js";
 
 function App() {
   return (
@@ -20,6 +21,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/briefings"
+          element={
+            <ProtectedRoute>
+              <Briefings />
             </ProtectedRoute>
           }
         />

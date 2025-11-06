@@ -2,6 +2,7 @@ import BriefingChat from "../components/BriefingChat.js";
 import QuoteUpload from "../components/QuoteUpload.js";
 import ComparisonDashboard from "../components/ComparisonDashboard.js";
 import QuoteAnalysis from "../components/QuoteAnalysis.js";
+import { Link } from "react-router-dom";
 
 export default function Dashboard() {
   return (
@@ -14,6 +15,11 @@ export default function Dashboard() {
         <p className="text-gray-600 text-lg">
           Manage your briefings, quotes, and analysis in one place.
         </p>
+        <div className="mt-4">
+          <Link to="/dashboard/briefings" className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+            Manage Briefings
+          </Link>
+        </div>
       </div>
 
       {/* Content Sections */}
