@@ -16,6 +16,8 @@ export default function BriefingChat({ briefingId: initialBriefingId }) {
   const [isLoading, setIsLoading] = useState(false);
   const [initialDescription, setInitialDescription] = useState("");
   const [lastAnswer, setLastAnswer] = useState("");
+  const [userLocation, setUserLocation] = useState("");
+  const [needsLocation, setNeedsLocation] = useState(false);
 
   // ✅ Auto-create or load briefing record
   useEffect(() => {
@@ -79,16 +81,18 @@ export default function BriefingChat({ briefingId: initialBriefingId }) {
     appendMessage({ role: "User", content: userInput });
     setLastAnswer(userInput);
 
-    try {
-      // --- STEP 1: First message (no questions yet) ---
-      if (questions.length === 0) {
-        setInitialDescription(userInput);
-
+        try {
+      // --- STEP 1.5: Handle location collection (CHECK THIS FIRST) ---
+      if (needsLocation) {
+        setUserLocation(userInput);
+        setNeedsLocation(false);
+        
+        // Now generate questions after we have location
         const response = await fetch("http://localhost:3001/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            description: userInput,
+            description: initialDescription,
             previousAnswer: "",
           }),
         });
@@ -99,8 +103,7 @@ export default function BriefingChat({ briefingId: initialBriefingId }) {
         if (!data.questions || data.questions.length === 0) {
           appendMessage({
             role: "AI",
-            content:
-              "I couldn't generate questions. Please try rephrasing your request.",
+            content: "I couldn't generate questions. Please try rephrasing your request.",
           });
           setIsLoading(false);
           return;
@@ -114,8 +117,7 @@ export default function BriefingChat({ briefingId: initialBriefingId }) {
         if (validQuestions.length === 0) {
           appendMessage({
             role: "AI",
-            content:
-              "Sorry, I had trouble understanding. Could you describe what you need more specifically?",
+            content: "Sorry, I had trouble understanding. Could you describe what you need more specifically?",
           });
           setIsLoading(false);
           return;
@@ -124,15 +126,29 @@ export default function BriefingChat({ briefingId: initialBriefingId }) {
         setQuestions(validQuestions);
         appendMessage({
           role: "AI",
-          content:
-            data.message ||
-            "Perfect! I have some questions to help create your quote request:",
+          content: data.message || "Perfect! I have some questions to help create your quote request:",
         });
         appendMessage({
-          role: "AI",
-          content: `Question 1: ${validQuestions[0]}`,
+          role: "AI", 
+          content: `Question 1: ${validQuestions[0]}`
         });
         setCurrentQuestionIndex(1);
+        setIsLoading(false);
+        return;
+      }
+
+      // --- STEP 1: First message (no questions yet) ---
+      if (questions.length === 0) {
+        setInitialDescription(userInput);
+
+        // Ask for location instead of immediately generating questions
+        setNeedsLocation(true);
+        appendMessage({
+          role: "AI", 
+          content: "Thanks! Now, which city and country are you located in? (e.g., Lisbon, Portugal)"
+        });
+        setIsLoading(false);
+        return;
       }
 
       // --- STEP 2: Follow-up answers ---
@@ -173,6 +189,7 @@ export default function BriefingChat({ briefingId: initialBriefingId }) {
             body: JSON.stringify({
               answers: newAnswers,
               initialDescription,
+              location: userLocation // ← ADD THIS LINE
             }),
           });
 
