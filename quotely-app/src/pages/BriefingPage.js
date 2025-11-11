@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient.js";
 import BriefingChat from "../components/BriefingChat.js";
+import SupplierSearchPanel from "../components/SupplierSearchPanel.js";
 import ComparisonDashboard from "../components/ComparisonDashboard.js";
 import QuoteAnalysis from "../components/QuoteAnalysis.js";
 
 export default function BriefingPage() {
-  // Get briefingId from URL params (you'll need to pass this as a prop or use your router)
   const briefingId = new URLSearchParams(window.location.search).get(
     "briefing"
   );
 
   const [briefing, setBriefing] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("chat"); // chat, analyze, compare
+  const [activeTab, setActiveTab] = useState("chat");
 
   useEffect(() => {
     async function fetchBriefing() {
@@ -20,14 +20,12 @@ export default function BriefingPage() {
         setLoading(false);
         return;
       }
-
       setLoading(true);
       const { data, error } = await supabase
         .from("briefings")
         .select("*")
         .eq("id", briefingId)
         .single();
-
       if (error) {
         console.error("Error fetching briefing:", error);
       } else {
@@ -35,11 +33,9 @@ export default function BriefingPage() {
       }
       setLoading(false);
     }
-
     fetchBriefing();
   }, [briefingId]);
 
-  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -51,7 +47,6 @@ export default function BriefingPage() {
     );
   }
 
-  // Error state
   if (!briefingId || !briefing) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
@@ -88,6 +83,7 @@ export default function BriefingPage() {
     );
   }
 
+  // Tabs configuration remains unchanged
   const tabs = [
     { id: "chat", label: "💬 Chat", description: "Create quote request" },
     { id: "analyze", label: "🔍 Analyze", description: "Extract quote data" },
@@ -98,31 +94,29 @@ export default function BriefingPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => (window.location.href = "/briefings")}
-              className="text-gray-600 hover:text-gray-900 transition flex items-center gap-2"
+        <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+          <button
+            onClick={() => (window.location.href = "/briefings")}
+            className="text-gray-600 hover:text-gray-900 transition flex items-center gap-2"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                />
-              </svg>
-              Back
-            </button>
-            <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
-              Active
-            </span>
-          </div>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            Back
+          </button>
+          <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+            Active
+          </span>
           <h1 className="text-3xl font-bold text-gray-900">
             {briefing.title || "Untitled Briefing"}
           </h1>
@@ -136,51 +130,39 @@ export default function BriefingPage() {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex gap-2">
-            {tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-6 py-4 font-medium transition-all border-b-3 ${
-                    isActive
-                      ? "text-blue-600 border-b-4 border-blue-600 bg-blue-50"
-                      : "text-gray-600 border-transparent hover:text-gray-900 hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="text-base">{tab.label}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {tab.description}
-                  </div>
-                </button>
-              );
-            })}
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-6 py-4 font-medium transition-all border-b-3 ${
+                  activeTab === tab.id
+                    ? "text-blue-600 border-b-4 border-blue-600 bg-blue-50"
+                    : "text-gray-600 border-transparent hover:text-gray-900 hover:bg-gray-50"
+                }`}
+              >
+                <div className="text-base">{tab.label}</div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  {tab.description}
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Chat Tab */}
         {activeTab === "chat" && (
-          <div>
-            <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-4 mb-6">
-              <h3 className="font-semibold text-blue-900 mb-1">
-                How it works:
-              </h3>
-              <p className="text-sm text-blue-800">
-                1. Tell the AI what you need
-                <br />
-                2. Answer a few quick questions
-                <br />
-                3. Get a professional quote request email to send to suppliers
-              </p>
+          <div className="flex gap-6">
+            <div className="flex-1 min-w-0">
+              <BriefingChat briefingId={briefing?.id} />
             </div>
-            <BriefingChat briefingId={briefing.id} />
+            <div className="w-96 sticky top-24 self-start">
+              <SupplierSearchPanel />
+            </div>
           </div>
         )}
 
-        {/* Analyze Tab */}
         {activeTab === "analyze" && (
           <div>
             <div className="bg-purple-50 border-l-4 border-purple-400 rounded-r-lg p-4 mb-6">
@@ -195,11 +177,10 @@ export default function BriefingPage() {
                 3. Data is saved automatically for comparison
               </p>
             </div>
-            <QuoteAnalysis briefingId={briefing.id} />
+            <QuoteAnalysis briefingId={briefing?.id} />
           </div>
         )}
 
-        {/* Compare Tab */}
         {activeTab === "compare" && (
           <div>
             <div className="bg-green-50 border-l-4 border-green-400 rounded-r-lg p-4 mb-6">
@@ -211,7 +192,7 @@ export default function BriefingPage() {
                 delivery times are highlighted in green.
               </p>
             </div>
-            <ComparisonDashboard briefingId={briefing.id} />
+            <ComparisonDashboard briefingId={briefing?.id} />
           </div>
         )}
       </div>
