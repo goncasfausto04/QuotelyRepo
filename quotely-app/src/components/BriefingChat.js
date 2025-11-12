@@ -20,8 +20,7 @@ export default function BriefingChat({
   const [isLoading, setIsLoading] = useState(false);
   const [initialDescription, setInitialDescription] = useState("");
   // const [lastAnswer, setLastAnswer] = useState("");
-  const [userLocation, setUserLocation] = useState("");
-  const [needsLocation, setNeedsLocation] = useState(false);
+  // location prompting removed — start the normal chatbot flow immediately
 
   useEffect(() => {
     const initBriefing = async () => {
@@ -97,15 +96,15 @@ export default function BriefingChat({
     // setLastAnswer(userInput);
 
     try {
-      if (needsLocation) {
-        setUserLocation(userInput);
-        setNeedsLocation(false);
+      // If there are no guided questions yet, treat this as the initial description
+      if (questions.length === 0) {
+        setInitialDescription(userInput);
 
         const response = await fetch("http://localhost:3001/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            description: initialDescription,
+            description: userInput,
             previousAnswer: "",
           }),
         });
@@ -154,18 +153,6 @@ export default function BriefingChat({
         return;
       }
 
-      if (questions.length === 0) {
-        setInitialDescription(userInput);
-        setNeedsLocation(true);
-        appendMessage({
-          role: "AI",
-          content:
-            "Thanks! Now, which city and country are you located in? (e.g., Lisbon, Portugal)",
-        });
-        setIsLoading(false);
-        return;
-      }
-
       const newAnswers = [...answers, userInput];
       setAnswers(newAnswers);
 
@@ -200,7 +187,6 @@ export default function BriefingChat({
           body: JSON.stringify({
             answers: newAnswers,
             initialDescription,
-            location: userLocation,
           }),
         });
 
@@ -219,7 +205,13 @@ export default function BriefingChat({
         });
 
         if (typeof onSuppliersFound === "function") {
-          onSuppliersFound(initialDescription, userLocation);
+          // location no longer provided — call with the initial description only
+          try {
+            onSuppliersFound(initialDescription);
+          } catch (e) {
+            // swallowing to avoid breaking chat if caller expects different signature
+            console.warn("onSuppliersFound handler error:", e);
+          }
         }
       } else {
         const nextQuestion = questions[currentQuestionIndex];
