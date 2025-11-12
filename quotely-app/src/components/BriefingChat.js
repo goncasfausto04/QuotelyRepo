@@ -70,22 +70,22 @@ export default function BriefingChat({
     });
   };
 
-  const appendMessages = (newMsgs) => {
-    if (!Array.isArray(newMsgs) || newMsgs.length === 0) return;
-    setMessages((prev) => {
-      const updated = [...prev, ...newMsgs];
-      saveChatToSupabase(updated);
-      return updated;
-    });
-  };
+  // const appendMessages = (newMsgs) => {
+  //   if (!Array.isArray(newMsgs) || newMsgs.length === 0) return;
+  //   setMessages((prev) => {
+  //     const updated = [...prev, ...newMsgs];
+  //     saveChatToSupabase(updated);
+  //     return updated;
+  //   });
+  // };
 
-  const resetConversation = () => {
-    setQuestions([]);
-    setAnswers([]);
-    setCurrentQuestionIndex(0);
-    setInitialDescription("");
-    setLastAnswer("");
-  };
+  // const resetConversation = () => {
+  //   setQuestions([]);
+  //   setAnswers([]);
+  //   setCurrentQuestionIndex(0);
+  //   setInitialDescription("");
+  //   setLastAnswer("");
+  // };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;

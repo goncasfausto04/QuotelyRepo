@@ -21,18 +21,30 @@ export default function Footer() {
               Turning briefings into smart decisions with AI-powered insights.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="text-gray-600 hover:text-gray-900">
+              <button
+                type="button"
+                className="text-gray-600 hover:text-gray-900"
+              >
                 𝕏
-              </a>
-              <a href="#" className="text-gray-600 hover:text-gray-900">
+              </button>
+              <button
+                type="button"
+                className="text-gray-600 hover:text-gray-900"
+              >
                 📷
-              </a>
-              <a href="#" className="text-gray-600 hover:text-gray-900">
+              </button>
+              <button
+                type="button"
+                className="text-gray-600 hover:text-gray-900"
+              >
                 ▶
-              </a>
-              <a href="#" className="text-gray-600 hover:text-gray-900">
+              </button>
+              <button
+                type="button"
+                className="text-gray-600 hover:text-gray-900"
+              >
                 in
-              </a>
+              </button>
             </div>
           </div>
 
@@ -42,12 +54,12 @@ export default function Footer() {
             <ul className="space-y-2">
               {useCases.map((item) => (
                 <li key={item}>
-                  <a
-                    href="#"
+                  <button
+                    type="button"
                     className="text-gray-600 hover:text-gray-900 text-sm"
                   >
                     {item}
-                  </a>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -59,12 +71,12 @@ export default function Footer() {
             <ul className="space-y-2">
               {explore.map((item) => (
                 <li key={item}>
-                  <a
-                    href="#"
+                  <button
+                    type="button"
                     className="text-gray-600 hover:text-gray-900 text-sm"
                   >
                     {item}
-                  </a>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -76,12 +88,12 @@ export default function Footer() {
             <ul className="space-y-2">
               {resources.map((item) => (
                 <li key={item}>
-                  <a
-                    href="#"
+                  <button
+                    type="button"
                     className="text-gray-600 hover:text-gray-900 text-sm"
                   >
                     {item}
-                  </a>
+                  </button>
                 </li>
               ))}
             </ul>

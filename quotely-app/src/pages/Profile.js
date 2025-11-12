@@ -1,15 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../supabaseClient.js";
-import {
-  User,
-  Phone,
-  MapPin,
-  Building2,
-  Mail,
-  Camera,
-  Check,
-  X,
-} from "lucide-react";
+import { User, Phone, Building2, Mail, Camera, Check, X } from "lucide-react";
 
 export default function Profile() {
   const [userData, setUserData] = useState(null);
@@ -115,7 +106,7 @@ export default function Profile() {
       }
 
       // Upload new photo
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("profile-photos")
         .upload(fileName, file, { upsert: true });
 

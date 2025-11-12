@@ -11,19 +11,22 @@ import {
   Download,
   BarChart3,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "../supabaseClient.js";
 
 export default function LandingPage() {
-  const [user, setUser] = useState(null);
+  // const [user, setUser] = useState(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data?.user || null);
-    });
+    // supabase.auth.getUser().then(({ data }) => {
+    //   setUser(data?.user || null);
+    // });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => setUser(session?.user || null)
+      (_event, session) => {
+        // Session state available if needed
+        console.log("Auth state changed:", session?.user || null);
+      }
     );
 
     return () => listener.subscription.unsubscribe();
