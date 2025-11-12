@@ -36,7 +36,7 @@ export default function LandingPage() {
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-white">
       {/* Hero Section */}
       <main className="flex-1">
-        <div className="max-w-6xl mx-auto px-6 py-16 text-center">
+        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 text-center">
           <div className="inline-flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-full px-4 py-2 mb-8">
             <Sparkles className="text-yellow-600" size={16} />
             <span className="text-sm text-yellow-800 font-medium">
@@ -44,22 +44,22 @@ export default function LandingPage() {
             </span>
           </div>
 
-          <h1 className="text-6xl font-bold mb-6 leading-tight">
+          <h1 className="text-3xl sm:text-6xl font-bold mb-6 leading-tight">
             Turning Briefings Into
             <br />
             <span className="text-blue-600">Smart Decisions</span>
           </h1>
 
-          <p className="text-xl text-gray-600 mb-10 max-w-3xl mx-auto">
+          <p className="text-base sm:text-xl text-gray-600 mb-10 max-w-3xl mx-auto">
             Transform complex briefings into actionable insights. Make
             data-driven decisions faster with AI-powered analysis and
             intelligent reporting.
           </p>
 
-          <div className="flex gap-4 justify-center mb-16">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             <Link
               to="/briefings"
-              className="bg-blue-600 text-white px-8 py-4 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-semibold text-lg"
+              className="w-full sm:w-auto bg-blue-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-semibold text-lg justify-center"
             >
               Start <ArrowRight size={20} />
             </Link>
@@ -69,7 +69,7 @@ export default function LandingPage() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-12 max-w-3xl mx-auto mb-20">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-3xl mx-auto mb-12">
             <div>
               <div className="text-4xl font-bold text-gray-900 mb-2">95%</div>
               <div className="text-sm text-gray-600">Time saved</div>
@@ -86,7 +86,7 @@ export default function LandingPage() {
         </div>
 
         {/* Features Section */}
-        <div className="max-w-6xl mx-auto px-6 pb-20">
+        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 pb-20">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold mb-4">
               Everything You Need to Make
@@ -99,7 +99,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-6 mb-20">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-20">
             <div className="bg-white rounded-xl border border-gray-200 p-8 hover:shadow-xl transition">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-5">
                 <FileText className="text-blue-600" size={24} />
@@ -184,7 +184,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
                 <Upload className="text-blue-600" size={28} />
@@ -226,7 +226,7 @@ export default function LandingPage() {
 
       {/* CTA Section */}
       <section className="bg-blue-600 text-white py-20">
-        <div className="max-w-4xl mx-auto px-6 text-center">
+        <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-4xl font-bold mb-6">
             Ready to Transform Your Decision-Making?
           </h2>
@@ -235,10 +235,10 @@ export default function LandingPage() {
             smart decisions. Start your free trial today—no credit card
             required.
           </p>
-          <div className="flex gap-4 justify-center mb-8">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <Link
               to="/briefings"
-              className="bg-yellow-400 text-gray-900 px-8 py-4 rounded-lg hover:bg-yellow-300 transition font-semibold text-lg"
+              className="w-full sm:w-auto bg-yellow-400 text-gray-900 px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-yellow-300 transition font-semibold text-lg text-center"
             >
               Start Now
             </Link>

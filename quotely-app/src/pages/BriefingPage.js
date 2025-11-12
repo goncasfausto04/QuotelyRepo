@@ -94,7 +94,7 @@ export default function BriefingPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col sm:flex-row items-center sm:justify-between gap-4 sm:gap-0">
           <button
             onClick={() => (window.location.href = "/briefings")}
             className="text-gray-600 hover:text-gray-900 transition flex items-center gap-2"
@@ -128,7 +128,7 @@ export default function BriefingPage() {
 
       {/* Tab Navigation */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 overflow-x-auto">
           <div className="flex gap-2">
             {tabs.map((tab) => (
               <button
@@ -151,13 +151,13 @@ export default function BriefingPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {activeTab === "chat" && (
-          <div className="flex gap-6">
+          <div className="flex flex-col lg:flex-row gap-6">
             <div className="flex-1 min-w-0">
               <BriefingChat briefingId={briefing?.id} />
             </div>
-            <div className="w-96 sticky top-24 self-start">
+            <div className="w-full lg:w-96 sticky top-24 self-start">
               <SupplierSearchPanel />
             </div>
           </div>

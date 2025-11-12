@@ -245,14 +245,14 @@ export default function BriefingChat({
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 border rounded-lg shadow-lg mt-8 bg-white">
+    <div className="w-full max-w-3xl mx-auto p-4 sm:p-6 border rounded-lg shadow-lg mt-6 bg-white">
       <h2 className="text-2xl font-bold mb-2">📧 Quote Request Assistant</h2>
       <p className="text-gray-600 text-sm mb-4">
         Tell me what you need, and I'll help you create a professional quote
         request email
       </p>
 
-      <div className="mb-4 h-96 overflow-y-auto border rounded p-4 bg-gray-50">
+      <div className="mb-4 h-64 sm:h-96 overflow-y-auto border rounded p-4 bg-gray-50">
         {messages.map((msg, idx) => (
           <div
             key={idx}
@@ -261,7 +261,7 @@ export default function BriefingChat({
                 ? "bg-blue-50 text-blue-900 border-l-4 border-blue-400"
                 : msg.role === "Email"
                 ? "bg-green-50 text-gray-900 border border-green-300 font-mono text-sm whitespace-pre-wrap"
-                : "bg-white text-gray-900 border border-gray-200 ml-8"
+                : "bg-white text-gray-900 border border-gray-200 sm:ml-8"
             }`}
           >
             <div className="flex justify-between items-start">
@@ -304,9 +304,9 @@ export default function BriefingChat({
         )}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <input
-          className="flex-1 border-2 border-gray-300 rounded-lg p-3 focus:border-blue-500 focus:outline-none"
+          className="w-full sm:flex-1 border-2 border-gray-300 rounded-lg p-3 focus:border-blue-500 focus:outline-none mb-2 sm:mb-0"
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -321,7 +321,7 @@ export default function BriefingChat({
           disabled={isLoading}
         />
         <button
-          className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+          className={`w-full sm:w-auto px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors ${
             isLoading || !input.trim()
               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
               : "bg-blue-600 text-white hover:bg-blue-700"
