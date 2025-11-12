@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: quotely-backend
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
