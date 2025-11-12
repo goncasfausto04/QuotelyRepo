@@ -100,7 +100,7 @@ export default function BriefingChat({
       if (questions.length === 0) {
         setInitialDescription(userInput);
 
-        const response = await fetch("http://localhost:3001/start", {
+        const response = await fetch("https://quotelyrepo.onrender.com/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -156,7 +156,7 @@ export default function BriefingChat({
       const newAnswers = [...answers, userInput];
       setAnswers(newAnswers);
 
-      const response = await fetch("http://localhost:3001/start", {
+      const response = await fetch("https://quotelyrepo.onrender.com/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -181,14 +181,17 @@ export default function BriefingChat({
             "Perfect! Let me create a professional quote request email for you...",
         });
 
-        const emailRes = await fetch("http://localhost:3001/compose-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            answers: newAnswers,
-            initialDescription,
-          }),
-        });
+        const emailRes = await fetch(
+          "https://quotelyrepo.onrender.com/compose-email",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              answers: newAnswers,
+              initialDescription,
+            }),
+          }
+        );
 
         if (!emailRes.ok) throw new Error(`Server error: ${emailRes.status}`);
 

@@ -23,7 +23,7 @@ export default function QuoteAnalysis({ briefingId }) {
 
     try {
       // 🔹 1. Send email text to your AI backend for analysis
-      const res = await fetch("http://localhost:3001/api/analyze-email", {
+      const res = await fetch("https://quotelyrepo.onrender.com/api/analyze-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emailText: text }),
