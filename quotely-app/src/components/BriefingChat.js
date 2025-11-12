@@ -19,7 +19,7 @@ export default function BriefingChat({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [initialDescription, setInitialDescription] = useState("");
-  const [lastAnswer, setLastAnswer] = useState("");
+  // const [lastAnswer, setLastAnswer] = useState("");
   const [userLocation, setUserLocation] = useState("");
   const [needsLocation, setNeedsLocation] = useState(false);
 
@@ -94,7 +94,7 @@ export default function BriefingChat({
     setInput("");
     setIsLoading(true);
     appendMessage({ role: "User", content: userInput });
-    setLastAnswer(userInput);
+    // setLastAnswer(userInput);
 
     try {
       if (needsLocation) {
