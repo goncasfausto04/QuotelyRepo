@@ -118,234 +118,248 @@ export default function AuthPage() {
           "linear-gradient(0deg, rgba(244, 244, 246, 0.3), rgba(244, 244, 246, 0.3)), #F9F8F6",
       }}
     >
-      <div className="relative w-full max-w-6xl h-[470px]">
-        {/* Banner Image - Left Side */}
-        <div className="absolute left-[-152px] top-[75px] right-[520px] h-[395px] rounded-lg shadow-xl overflow-hidden">
-          <img
-            src="/banner.jpg"
-            alt="Quotely Banner"
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        {/* Auth Card - Right Side */}
-        <div className="absolute right-[-61px] top-0 left-[653px] h-[470px] bg-white border border-gray-200 rounded-lg shadow-sm px-6 py-6">
-          {/* Logo */}
-          <div className="flex justify-center mb-6">
+      <div className="w-full max-w-4xl mx-auto">
+        <div className="flex flex-col md:flex-row items-stretch gap-6">
+          {/* Banner Image for md+ */}
+          <div className="hidden md:block md:w-1/2 rounded-lg overflow-hidden shadow-xl">
             <img
-              src="/whitelogo.jpg"
-              alt="Quotely Logo"
-              className="w-16 h-16 object-contain"
+              src="/banner.jpg"
+              alt="Quotely Banner"
+              className="w-full h-full object-cover"
             />
           </div>
 
-          {/* Heading */}
-          <h2
-            className="text-xl font-semibold text-center mb-1"
-            style={{ color: "#17171C", letterSpacing: "-0.6px" }}
-          >
-            {isForgotPassword ? "Reset Password" : "Welcome to Quotely"}
-          </h2>
-          <p className="text-center text-sm mb-6" style={{ color: "#797986" }}>
-            {isForgotPassword
-              ? "Enter your email to receive a reset link"
-              : "Turn briefings into smart decisions"}
-          </p>
+          {/* Mobile banner */}
+          <div className="md:hidden w-full h-40 rounded-lg overflow-hidden shadow-md">
+            <img
+              src="/banner.jpg"
+              alt="Quotely Banner"
+              className="w-full h-full object-cover"
+            />
+          </div>
 
-          {/* Tab List */}
-          {!isForgotPassword && (
-            <div
-              className="rounded-md p-1 mb-6 flex"
-              style={{ background: "#F4F4F6" }}
-            >
-              <button
-                className={`flex-1 py-2 px-4 rounded text-sm font-semibold transition-all ${
-                  isLogin ? "bg-white shadow-sm" : ""
-                }`}
-                style={{ color: isLogin ? "#17171C" : "#797986" }}
-                onClick={() => {
-                  setIsLogin(true);
-                  setErrorMsg("");
-                  setSuccessMsg("");
-                  setFormData((f) => ({ ...f, confirmPassword: "" }));
-                  setPasswordError("");
-                }}
-              >
-                Sign In
-              </button>
-              <button
-                className={`flex-1 py-2 px-4 rounded text-sm font-semibold transition-all ${
-                  !isLogin ? "bg-white shadow-sm" : ""
-                }`}
-                style={{ color: !isLogin ? "#17171C" : "#797986" }}
-                onClick={() => {
-                  setIsLogin(false);
-                  setErrorMsg("");
-                  setSuccessMsg("");
-                  setPasswordError("");
-                }}
-              >
-                Sign Up
-              </button>
-            </div>
-          )}
-
-          {/* Error/Success Messages */}
-          {errorMsg && (
-            <div
-              className="mb-4 p-3 rounded-md text-sm"
-              style={{ background: "#FEE2E2", color: "#991B1B" }}
-            >
-              {errorMsg}
-            </div>
-          )}
-          {successMsg && (
-            <div
-              className="mb-4 p-3 rounded-md text-sm"
-              style={{ background: "#D1FAE5", color: "#065F46" }}
-            >
-              {successMsg}
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="Your name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-900"
-                  required
-                />
-              </div>
-            )}
-
-            <div>
-              <label
-                className="block text-sm font-semibold mb-2"
-                style={{ color: "#17171C" }}
-              >
-                Email
-              </label>
-              <input
-                type="email"
-                name="email"
-                placeholder="your@email.com"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                style={{ border: "1px solid #E3E3E8", color: "#797986" }}
-                required
+          {/* Auth Card */}
+          <div className="w-full md:w-1/2 bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+            {/* Logo */}
+            <div className="flex justify-center mb-6">
+              <img
+                src="/whitelogo.jpg"
+                alt="Quotely Logo"
+                className="w-16 h-16 object-contain"
               />
             </div>
 
+            {/* Heading */}
+            <h2
+              className="text-xl font-semibold text-center mb-1"
+              style={{ color: "#17171C", letterSpacing: "-0.6px" }}
+            >
+              {isForgotPassword ? "Reset Password" : "Welcome to Quotely"}
+            </h2>
+            <p
+              className="text-center text-sm mb-6"
+              style={{ color: "#797986" }}
+            >
+              {isForgotPassword
+                ? "Enter your email to receive a reset link"
+                : "Turn briefings into smart decisions"}
+            </p>
+
+            {/* Tab List */}
             {!isForgotPassword && (
+              <div
+                className="rounded-md p-1 mb-6 flex"
+                style={{ background: "#F4F4F6" }}
+              >
+                <button
+                  className={`flex-1 py-2 px-4 rounded text-sm font-semibold transition-all ${
+                    isLogin ? "bg-white shadow-sm" : ""
+                  }`}
+                  style={{ color: isLogin ? "#17171C" : "#797986" }}
+                  onClick={() => {
+                    setIsLogin(true);
+                    setErrorMsg("");
+                    setSuccessMsg("");
+                    setFormData((f) => ({ ...f, confirmPassword: "" }));
+                    setPasswordError("");
+                  }}
+                >
+                  Sign In
+                </button>
+                <button
+                  className={`flex-1 py-2 px-4 rounded text-sm font-semibold transition-all ${
+                    !isLogin ? "bg-white shadow-sm" : ""
+                  }`}
+                  style={{ color: !isLogin ? "#17171C" : "#797986" }}
+                  onClick={() => {
+                    setIsLogin(false);
+                    setErrorMsg("");
+                    setSuccessMsg("");
+                    setPasswordError("");
+                  }}
+                >
+                  Sign Up
+                </button>
+              </div>
+            )}
+
+            {/* Error/Success Messages */}
+            {errorMsg && (
+              <div
+                className="mb-4 p-3 rounded-md text-sm"
+                style={{ background: "#FEE2E2", color: "#991B1B" }}
+              >
+                {errorMsg}
+              </div>
+            )}
+            {successMsg && (
+              <div
+                className="mb-4 p-3 rounded-md text-sm"
+                style={{ background: "#D1FAE5", color: "#065F46" }}
+              >
+                {successMsg}
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {!isLogin && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    placeholder="Your name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    required
+                  />
+                </div>
+              )}
+
               <div>
                 <label
                   className="block text-sm font-semibold mb-2"
                   style={{ color: "#17171C" }}
                 >
-                  Password
+                  Email
                 </label>
                 <input
-                  type="password"
-                  name="password"
-                  placeholder="••••••••"
-                  value={formData.password}
+                  type="email"
+                  name="email"
+                  placeholder="your@email.com"
+                  value={formData.email}
                   onChange={handleChange}
                   className="w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2"
                   style={{ border: "1px solid #E3E3E8", color: "#797986" }}
                   required
                 />
               </div>
-            )}
 
-            {!isLogin && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Confirm Password
-                </label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  placeholder="••••••••"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-900"
-                  required
-                />
-                {passwordError && (
-                  <p className="text-red-500 text-sm mt-1">{passwordError}</p>
-                )}
+              {!isForgotPassword && (
+                <div>
+                  <label
+                    className="block text-sm font-semibold mb-2"
+                    style={{ color: "#17171C" }}
+                  >
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                    style={{ border: "1px solid #E3E3E8", color: "#797986" }}
+                    required
+                  />
+                </div>
+              )}
+
+              {!isLogin && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Confirm Password
+                  </label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    placeholder="••••••••"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    required
+                  />
+                  {passwordError && (
+                    <p className="text-red-500 text-sm mt-1">{passwordError}</p>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={
+                  isLoading ||
+                  (!isLogin &&
+                    !isForgotPassword &&
+                    formData.password !== formData.confirmPassword)
+                }
+                className={`w-full text-white py-2 px-4 rounded-md text-sm font-semibold transition-all ${
+                  isLoading ||
+                  (!isLogin &&
+                    !isForgotPassword &&
+                    formData.password !== formData.confirmPassword)
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:opacity-90"
+                }`}
+                style={{ background: "#000099" }}
+              >
+                {isLoading
+                  ? "Loading..."
+                  : isForgotPassword
+                  ? "Send Reset Link"
+                  : isLogin
+                  ? "Sign In"
+                  : "Sign Up"}
+              </button>
+            </form>
+
+            {isForgotPassword && (
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => {
+                    setIsForgotPassword(false);
+                    setErrorMsg("");
+                    setSuccessMsg("");
+                  }}
+                  className="text-sm font-medium hover:underline"
+                  style={{ color: "#000099" }}
+                >
+                  ← Back to Sign In
+                </button>
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={
-                isLoading ||
-                (!isLogin &&
-                  !isForgotPassword &&
-                  formData.password !== formData.confirmPassword)
-              }
-              className={`w-full text-white py-2 px-4 rounded-md text-sm font-semibold transition-all ${
-                isLoading ||
-                (!isLogin &&
-                  !isForgotPassword &&
-                  formData.password !== formData.confirmPassword)
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:opacity-90"
-              }`}
-              style={{ background: "#000099" }}
-            >
-              {isLoading
-                ? "Loading..."
-                : isForgotPassword
-                ? "Send Reset Link"
-                : isLogin
-                ? "Sign In"
-                : "Sign Up"}
-            </button>
-          </form>
-
-          {isForgotPassword && (
-            <div className="text-center mt-4">
-              <button
-                onClick={() => {
-                  setIsForgotPassword(false);
-                  setErrorMsg("");
-                  setSuccessMsg("");
-                }}
-                className="text-sm font-medium hover:underline"
-                style={{ color: "#000099" }}
-              >
-                ← Back to Sign In
-              </button>
-            </div>
-          )}
-
-          {!isForgotPassword && isLogin && (
-            <div className="text-center mt-4">
-              <button
-                onClick={() => {
-                  setIsForgotPassword(true);
-                  setErrorMsg("");
-                  setSuccessMsg("");
-                }}
-                className="text-sm font-medium hover:underline"
-                style={{ color: "#000099" }}
-              >
-                Forgot Password?
-              </button>
-            </div>
-          )}
+            {!isForgotPassword && isLogin && (
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => {
+                    setIsForgotPassword(true);
+                    setErrorMsg("");
+                    setSuccessMsg("");
+                  }}
+                  className="text-sm font-medium hover:underline"
+                  style={{ color: "#000099" }}
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
