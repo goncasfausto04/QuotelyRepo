@@ -1,23 +1,25 @@
 export default function Footer() {
-  const useCases = [
-    "Placeholder text",
-    "Placeholder text",
-  ];
-  const explore = [
-    "Placeholder text",
-    "Placeholder text",
-  ];
-  const resources = [
-    "Placeholder text",
-    "Placeholder text",
-  ];
+  const useCases = ["Placeholder text", "Placeholder text"];
+  const explore = ["Placeholder text", "Placeholder text"];
+  const resources = ["Placeholder text", "Placeholder text"];
 
   return (
-    <footer className="bg-white border-t border-gray-200 px-6 py-12">
-      <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-4 gap-12 mb-8">
+    <footer className="bg-white border-t border-gray-200 py-12">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid grid-cols-4 gap-8 mb-8">
+          {/* Logo and Description */}
           <div>
-            <div className="text-xl font-bold mb-4">Quotely</div>
+            <div className="flex items-center gap-2 mb-4">
+              <img
+                src="/whitelogo.jpg"
+                alt="Quotely Logo"
+                className="w-6 h-6 object-contain rounded-lg border border-gray-200"
+              />
+              <span className="text-xl font-bold">Quotely</span>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Turning briefings into smart decisions with AI-powered insights.
+            </p>
             <div className="flex gap-4">
               <a href="#" className="text-gray-600 hover:text-gray-900">
                 𝕏
@@ -34,8 +36,9 @@ export default function Footer() {
             </div>
           </div>
 
+          {/* Use Cases Column */}
           <div>
-            <h3 className="font-semibold mb-4">Use cases</h3>
+            <h4 className="font-semibold mb-4">Use cases</h4>
             <ul className="space-y-2">
               {useCases.map((item) => (
                 <li key={item}>
@@ -50,8 +53,9 @@ export default function Footer() {
             </ul>
           </div>
 
+          {/* Explore Column */}
           <div>
-            <h3 className="font-semibold mb-4">Explore</h3>
+            <h4 className="font-semibold mb-4">Explore</h4>
             <ul className="space-y-2">
               {explore.map((item) => (
                 <li key={item}>
@@ -66,8 +70,9 @@ export default function Footer() {
             </ul>
           </div>
 
+          {/* Resources Column */}
           <div>
-            <h3 className="font-semibold mb-4">Resources</h3>
+            <h4 className="font-semibold mb-4">Resources</h4>
             <ul className="space-y-2">
               {resources.map((item) => (
                 <li key={item}>
@@ -81,6 +86,11 @@ export default function Footer() {
               ))}
             </ul>
           </div>
+        </div>
+
+        {/* Copyright */}
+        <div className="border-t border-gray-200 pt-8 text-center text-sm text-gray-600">
+          © 2025 Quotely. All rights reserved.
         </div>
       </div>
     </footer>

@@ -5,6 +5,7 @@ import LandingPage from "./pages/LandingPage.js";
 import BriefingPage from "./pages/BriefingPage.js";
 import Profile from "./pages/Profile.js";
 import AuthPage from "./pages/AuthPage.js";
+import ResetPassword from "./pages/ResetPassword.js";
 import ProtectedRoute from "./components/ProtectedRoute.js";
 import Briefings from "./pages/Briefings.js";
 import CreateBriefing from "./pages/CreateBriefing.js";
@@ -53,6 +54,7 @@ function App() {
 
         {/* Public Route */}
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
       <Footer />
     </Router>

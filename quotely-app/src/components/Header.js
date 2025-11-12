@@ -37,18 +37,25 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4">
-      <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <Link to="/" className="text-2xl font-bold text-blue-500">
-          Quotely
+    <nav className="bg-white border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2">
+          <img
+            src="/blacklogo.jpg"
+            alt="Quotely Logo"
+            className="w-8 h-8 object-contain rounded-lg border border-gray-200"
+          />
+          <span className="text-xl font-bold">Quotely</span>
         </Link>
 
-        <nav className="flex items-center gap-6">
+        {/* Navigation */}
+        <div className="flex items-center gap-8">
           {user ? (
             <>
               <Link
                 to="/briefings"
-                className="text-gray-700 hover:text-gray-900"
+                className="text-gray-600 hover:text-gray-900 font-medium"
               >
                 Briefings
               </Link>
@@ -62,13 +69,13 @@ export default function Header() {
                         encodeURIComponent(user.email || "User")
                     }
                     alt={user?.name || user?.email || "User"}
-                    className="w-9 h-9 rounded-full border-2 border-gray-300 object-cover cursor-pointer hover:border-blue-500 transition"
+                    className="w-9 h-9 rounded-full border-2 border-gray-300 object-cover cursor-pointer hover:border-blue-600 transition"
                   />
                 </Link>
 
                 <button
                   onClick={handleLogout}
-                  className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
+                  className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition font-medium"
                 >
                   Logout
                 </button>
@@ -76,23 +83,22 @@ export default function Header() {
             </>
           ) : (
             <>
-              {/* BriefingPage hidden for unauthenticated users */}
               <Link
                 to="/auth"
-                className="bg-blue-500 text-white px-5 py-2 rounded-md hover:bg-blue-600 transition"
+                className="text-gray-600 hover:text-gray-900 font-medium"
               >
-                Get Started
+                Sign in
               </Link>
               <Link
                 to="/auth"
-                className="border border-gray-300 text-gray-700 px-5 py-2 rounded-md hover:bg-gray-50 transition"
+                className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition font-medium"
               >
-                Sign In
+                Start
               </Link>
             </>
           )}
-        </nav>
+        </div>
       </div>
-    </header>
+    </nav>
   );
 }
