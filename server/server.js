@@ -93,7 +93,7 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
-// --- ROUTE 5: Email / Quote Analysis ---
+// --- ROUTE 1: Email / Quote Analysis ---
 app.post("/api/analyze-email", async (req, res) => {
   const { emailText } = req.body;
   if (!emailText?.trim()) {
@@ -234,8 +234,7 @@ RETURN ONLY THE QUESTION AS PLAIN TEXT (no JSON, no formatting).
   }
 });
 
-// --- ROUTE 3: Get Next Question (Based on User Answer) ---
-// --- ROUTE: Get Next Question (Based on User Answer) ---
+// --- ROUTE 3: Get Next Question (Based on User Answer)
 app.post("/next-question", async (req, res) => {
   const { briefingId, userAnswer } = req.body;
 

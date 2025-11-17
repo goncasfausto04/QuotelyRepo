@@ -20,6 +20,7 @@ export default function BriefingChat({
   const [conversationComplete, setConversationComplete] = useState(false);
 
   // Initialize briefing from Supabase or create new one
+  // Initialize briefing from Supabase or create new one
   useEffect(() => {
     const initBriefing = async () => {
       if (initialBriefingId) {
@@ -31,9 +32,17 @@ export default function BriefingChat({
 
         if (!error && data && data.chat?.length > 0) {
           setMessages(data.chat);
+
           // Check if conversation was already started
           const hasUserMessages = data.chat.some((msg) => msg.role === "User");
           setIsConversationStarted(hasUserMessages);
+
+          // ✅ NEW: Check if conversation is complete (email was generated)
+          const hasEmail = data.chat.some((msg) => msg.role === "Email");
+          if (hasEmail) {
+            setConversationComplete(true);
+            console.log("✅ Loaded completed conversation with email");
+          }
         }
         setBriefingId(initialBriefingId);
       } else {
