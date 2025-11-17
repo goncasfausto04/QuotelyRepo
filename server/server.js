@@ -3,11 +3,54 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY // Use service key for backend
+);
+
+// Helper to save conversation to database
+async function saveConversationToDb(briefingId, conversation) {
+  const { error } = await supabase
+    .from("briefings")
+    .update({
+      conversation_state: {
+        history: conversation.history,
+        description: conversation.description,
+      },
+    })
+    .eq("id", briefingId);
+
+  if (error) {
+    console.error("Error saving conversation state:", error);
+  }
+}
+
+// Helper to load conversation from database
+async function loadConversationFromDb(briefingId) {
+  const { data, error } = await supabase
+    .from("briefings")
+    .select("conversation_state")
+    .eq("id", briefingId)
+    .single();
+
+  if (error || !data?.conversation_state) {
+    return null;
+  }
+
+  return {
+    history: data.conversation_state.history || [],
+    description: data.conversation_state.description,
+    briefingId: briefingId,
+  };
+}
 
 // --- Helper: Retry with exponential backoff ---
 async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
@@ -50,7 +93,7 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
-// --- ROUTE 1: Email / Quote Analysis ---
+// --- ROUTE 5: Email / Quote Analysis ---
 app.post("/api/analyze-email", async (req, res) => {
   const { emailText } = req.body;
   if (!emailText?.trim()) {
@@ -142,11 +185,13 @@ app.post("/start", async (req, res) => {
     console.log("🚀 Starting new conversation for briefing:", briefingId);
 
     // Initialize conversation state
-    conversations.set(briefingId, {
+    const newConversation = {
       history: [],
       description: description,
-      briefingId: briefingId
-    });
+      briefingId: briefingId,
+    };
+
+    conversations.set(briefingId, newConversation);
 
     // Generate first question
     const response = await retryWithBackoff(async () => {
@@ -163,31 +208,34 @@ RETURN ONLY THE QUESTION AS PLAIN TEXT (no JSON, no formatting).
       });
     });
 
-    const firstQuestion = response.text.trim().replace(/["\[\]]/g, '');
-    
+    const firstQuestion = response.text.trim().replace(/["\[\]]/g, "");
+
     // Save question to conversation history
     conversations.get(briefingId).history.push({
       role: "assistant",
-      content: firstQuestion
+      content: firstQuestion,
     });
+
+    // ✅ SAVE TO DATABASE
+    await saveConversationToDb(briefingId, conversations.get(briefingId));
 
     console.log("✅ First question generated:", firstQuestion);
 
     res.json({
       question: firstQuestion,
-      briefingId: briefingId
+      briefingId: briefingId,
     });
-
   } catch (error) {
     console.error("❌ Error starting conversation:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to start conversation",
-      details: error.message 
+      details: error.message,
     });
   }
 });
 
-// --- ROUTE 2: Get Next Question (Based on User Answer) ---
+// --- ROUTE 3: Get Next Question (Based on User Answer) ---
+// --- ROUTE: Get Next Question (Based on User Answer) ---
 app.post("/next-question", async (req, res) => {
   const { briefingId, userAnswer } = req.body;
 
@@ -200,13 +248,54 @@ app.post("/next-question", async (req, res) => {
   }
 
   try {
-    // Get conversation state
+    // ✅ TRY TO GET FROM MEMORY FIRST, THEN FROM DATABASE
     let conversation = conversations.get(briefingId);
-    
+
     if (!conversation) {
-      return res.status(404).json({ 
-        error: "Conversation not found. Please start a new conversation." 
-      });
+      console.log("⚠️ Conversation not in memory, loading from database...");
+      conversation = await loadConversationFromDb(briefingId);
+
+      if (!conversation) {
+        // ❌ Still not found? Try to reconstruct from chat as fallback
+        console.log(
+          "⚠️ conversation_state not found, reconstructing from chat..."
+        );
+
+        const { data, error } = await supabase
+          .from("briefings")
+          .select("chat")
+          .eq("id", briefingId)
+          .single();
+
+        if (error || !data?.chat || data.chat.length === 0) {
+          return res.status(404).json({
+            error: "Conversation not found. Please start a new conversation.",
+          });
+        }
+
+        // Reconstruct conversation from chat messages
+        const chatMessages = data.chat;
+        const description =
+          chatMessages.find((msg) => msg.role === "User")?.content || "";
+
+        conversation = {
+          history: chatMessages
+            .filter((msg) => msg.role === "AI" || msg.role === "User")
+            .map((msg) => ({
+              role: msg.role === "User" ? "user" : "assistant",
+              content: msg.content,
+            })),
+          description: description,
+          briefingId: briefingId,
+        };
+
+        console.log("✅ Conversation reconstructed from chat messages");
+      } else {
+        console.log("✅ Conversation loaded from database");
+      }
+
+      // Restore to memory
+      conversations.set(briefingId, conversation);
     }
 
     console.log("💬 Processing answer for briefing:", briefingId);
@@ -214,12 +303,14 @@ app.post("/next-question", async (req, res) => {
     // Add user's answer to history
     conversation.history.push({
       role: "user",
-      content: userAnswer
+      content: userAnswer,
     });
 
     // Build conversation context
     const conversationContext = conversation.history
-      .map(msg => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+      .map(
+        (msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
+      )
       .join("\n");
 
     // Generate next question or check if complete
@@ -264,17 +355,17 @@ RETURN: Either ONE question as plain text, OR the word "COMPLETE" (no quotes, no
       });
     });
 
-    const aiResponse = response.text.trim().replace(/["\[\]]/g, '');
+    const aiResponse = response.text.trim().replace(/["\[\]]/g, "");
     console.log("🤖 AI Response:", aiResponse);
 
     // Check if conversation is complete
     if (aiResponse.toUpperCase().includes("COMPLETE")) {
       console.log("✅ Conversation complete for briefing:", briefingId);
-      
+
       // Extract collected information
       const collectedInfo = {
         description: conversation.description,
-        conversationHistory: conversation.history
+        conversationHistory: conversation.history,
       };
 
       // Clean up temporary conversation state
@@ -283,35 +374,38 @@ RETURN: Either ONE question as plain text, OR the word "COMPLETE" (no quotes, no
       return res.json({
         done: true,
         message: "Great! I have all the information I need.",
-        collectedInfo: collectedInfo
+        collectedInfo: collectedInfo,
       });
     }
 
     // Save next question to history
     conversation.history.push({
       role: "assistant",
-      content: aiResponse
+      content: aiResponse,
     });
 
     // Update conversation in memory
     conversations.set(briefingId, conversation);
 
+    // ✅ SAVE TO DATABASE
+    await saveConversationToDb(briefingId, conversation);
+
     console.log("❓ Next question:", aiResponse);
 
     res.json({
       question: aiResponse,
-      briefingId: briefingId
+      briefingId: briefingId,
     });
-
   } catch (error) {
     console.error("❌ Error generating next question:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to generate next question",
-      details: error.message 
+      details: error.message,
     });
   }
 });
-// --- ROUTE 3: Generate Quote Request Email ---
+
+// --- ROUTE 4: Generate Quote Request Email ---
 app.post("/compose-email", async (req, res) => {
   const { briefingId, collectedInfo } = req.body;
 
@@ -323,7 +417,9 @@ app.post("/compose-email", async (req, res) => {
     console.log("📧 Composing email for briefing:", briefingId);
 
     const conversationHistory = collectedInfo.conversationHistory
-      .map(msg => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+      .map(
+        (msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
+      )
       .join("\n");
 
     const response = await retryWithBackoff(
@@ -367,13 +463,19 @@ RETURN THE COMPLETE EMAIL (including subject line). No markdown code blocks.
     let email = response.text.trim();
     email = email.replace(/``````/g, "");
 
-    console.log("✅ Email generated successfully");
+    // Append a short AI-generation notice/footer to every generated email
+    const footerNotice =
+      "\n\n---\nThis email was AI-generated using Quotely: https://quotely-repo.vercel.app";
+    if (!email.includes(footerNotice)) {
+      email = `${email}${footerNotice}`;
+    }
+
+    console.log("✅ Email generated successfully (footer appended)");
 
     res.json({
       email: email,
       message: "Email ready! You can copy and send it to suppliers.",
     });
-
   } catch (error) {
     console.error("❌ Error generating email:", error);
     res.status(500).json({
