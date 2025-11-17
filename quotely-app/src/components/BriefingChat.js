@@ -14,14 +14,11 @@ export default function BriefingChat({
     },
   ]);
   const [input, setInput] = useState("");
-  const [questions, setQuestions] = useState([]);
-  const [answers, setAnswers] = useState([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [initialDescription, setInitialDescription] = useState("");
-  // const [lastAnswer, setLastAnswer] = useState("");
-  // location prompting removed — start the normal chatbot flow immediately
+  const [isConversationStarted, setIsConversationStarted] = useState(false);
+  const [conversationComplete, setConversationComplete] = useState(false);
 
+  // Initialize briefing from Supabase or create new one
   useEffect(() => {
     const initBriefing = async () => {
       if (initialBriefingId) {
@@ -33,6 +30,9 @@ export default function BriefingChat({
 
         if (!error && data && data.chat?.length > 0) {
           setMessages(data.chat);
+          // Check if conversation was already started
+          const hasUserMessages = data.chat.some((msg) => msg.role === "User");
+          setIsConversationStarted(hasUserMessages);
         }
         setBriefingId(initialBriefingId);
       } else {
@@ -51,6 +51,7 @@ export default function BriefingChat({
     initBriefing();
   }, [initialBriefingId]);
 
+  // Save chat messages to Supabase
   const saveChatToSupabase = async (newMessages) => {
     if (!briefingId) return;
     const { error } = await supabase
@@ -61,6 +62,7 @@ export default function BriefingChat({
     if (error) console.error("Error saving chat:", error.message);
   };
 
+  // Append single message and save
   const appendMessage = (newMsg) => {
     setMessages((prev) => {
       const updated = [...prev, newMsg];
@@ -69,131 +71,92 @@ export default function BriefingChat({
     });
   };
 
-  // const appendMessages = (newMsgs) => {
-  //   if (!Array.isArray(newMsgs) || newMsgs.length === 0) return;
-  //   setMessages((prev) => {
-  //     const updated = [...prev, ...newMsgs];
-  //     saveChatToSupabase(updated);
-  //     return updated;
-  //   });
-  // };
-
-  // const resetConversation = () => {
-  //   setQuestions([]);
-  //   setAnswers([]);
-  //   setCurrentQuestionIndex(0);
-  //   setInitialDescription("");
-  //   setLastAnswer("");
-  // };
-
+  // Main message sending function
   const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || conversationComplete) return;
 
     const userInput = input.trim();
     setInput("");
     setIsLoading(true);
     appendMessage({ role: "User", content: userInput });
-    // setLastAnswer(userInput);
 
     try {
-      // If there are no guided questions yet, treat this as the initial description
-      if (questions.length === 0) {
-        setInitialDescription(userInput);
+      // CASE 1: Starting a new conversation (first user message)
+      if (!isConversationStarted) {
+        console.log("Starting new conversation with:", userInput);
 
-        const response = await fetch("https://quotelyrepo.onrender.com/start", {
+        const response = await fetch("http://localhost:3001/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             description: userInput,
-            previousAnswer: "",
+            briefingId: briefingId,
           }),
         });
 
-        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.error || `Server error: ${response.status}`
+          );
+        }
+
         const data = await response.json();
+        setIsConversationStarted(true);
 
-        if (!data.questions || data.questions.length === 0) {
-          appendMessage({
-            role: "AI",
-            content:
-              "I couldn't generate questions. Please try rephrasing your request.",
-          });
-          setIsLoading(false);
-          return;
-        }
-
-        const validQuestions = data.questions.filter(
-          (q) =>
-            typeof q === "string" && q.trim().length > 10 && q.includes("?")
-        );
-
-        if (validQuestions.length === 0) {
-          appendMessage({
-            role: "AI",
-            content:
-              "Sorry, I had trouble understanding. Could you describe what you need more specifically?",
-          });
-          setIsLoading(false);
-          return;
-        }
-
-        setQuestions(validQuestions);
+        // Display the first question
         appendMessage({
           role: "AI",
-          content:
-            data.message ||
-            "Perfect! I have some questions to help create your quote request:",
+          content: data.question,
         });
-        appendMessage({
-          role: "AI",
-          content: `Question 1: ${validQuestions[0]}`,
-        });
-        setCurrentQuestionIndex(1);
+
         setIsLoading(false);
         return;
       }
 
-      const newAnswers = [...answers, userInput];
-      setAnswers(newAnswers);
+      // CASE 2: Continuing the conversation (subsequent answers)
+      console.log("Sending answer:", userInput);
 
-      const response = await fetch("https://quotelyrepo.onrender.com/start", {
+      const response = await fetch("http://localhost:3001/next-question", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          description: initialDescription,
-          previousAnswer: userInput,
+          briefingId: briefingId,
+          userAnswer: userInput,
         }),
       });
 
-      const data = await response.json();
-
-      if (data.questions && data.questions.length === 1) {
-        appendMessage({ role: "AI", content: data.message });
-        appendMessage({ role: "AI", content: data.questions[0] });
-        setIsLoading(false);
-        return;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
-      if (currentQuestionIndex >= questions.length) {
+      const data = await response.json();
+
+      // CASE 2A: Conversation is complete - generate email
+      if (data.done) {
+        console.log("Conversation complete!");
+        setConversationComplete(true);
+
         appendMessage({
           role: "AI",
           content:
             "Perfect! Let me create a professional quote request email for you...",
         });
 
-        const emailRes = await fetch(
-          "https://quotelyrepo.onrender.com/compose-email",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              answers: newAnswers,
-              initialDescription,
-            }),
-          }
-        );
+        // Call email composition endpoint
+        const emailRes = await fetch("http://localhost:3001/compose-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            briefingId: briefingId,
+            collectedInfo: data.collectedInfo,
+          }),
+        });
 
-        if (!emailRes.ok) throw new Error(`Server error: ${emailRes.status}`);
+        if (!emailRes.ok) {
+          throw new Error(`Email generation failed: ${emailRes.status}`);
+        }
 
         const emailData = await emailRes.json();
 
@@ -207,22 +170,21 @@ export default function BriefingChat({
           isEmail: true,
         });
 
+        // Trigger supplier search if callback exists
         if (typeof onSuppliersFound === "function") {
-          // location no longer provided — call with the initial description only
           try {
-            onSuppliersFound(initialDescription);
+            onSuppliersFound(data.collectedInfo);
           } catch (e) {
-            // swallowing to avoid breaking chat if caller expects different signature
             console.warn("onSuppliersFound handler error:", e);
           }
         }
-      } else {
-        const nextQuestion = questions[currentQuestionIndex];
+      }
+      // CASE 2B: Ask next question
+      else {
         appendMessage({
           role: "AI",
-          content: `Question ${currentQuestionIndex + 1}: ${nextQuestion}`,
+          content: data.question,
         });
-        setCurrentQuestionIndex((prev) => prev + 1);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -235,6 +197,7 @@ export default function BriefingChat({
     }
   };
 
+  // Handle Enter key press
   const handleKeyPress = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -242,9 +205,30 @@ export default function BriefingChat({
     }
   };
 
+  // Copy email to clipboard
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     alert("Email copied to clipboard!");
+  };
+
+  // Reset conversation to start over
+  const resetConversation = () => {
+    setIsConversationStarted(false);
+    setConversationComplete(false);
+    setMessages([
+      {
+        role: "AI",
+        content:
+          "Hi! What product or service do you need to request quotes for?",
+      },
+    ]);
+    saveChatToSupabase([
+      {
+        role: "AI",
+        content:
+          "Hi! What product or service do you need to request quotes for?",
+      },
+    ]);
   };
 
   return (
@@ -317,24 +301,35 @@ export default function BriefingChat({
           placeholder={
             isLoading
               ? "Please wait..."
-              : questions.length === 0
+              : !isConversationStarted
               ? "e.g., I need 100 custom t-shirts with my logo"
+              : conversationComplete
+              ? "Conversation complete"
               : "Type your answer..."
           }
-          disabled={isLoading}
+          disabled={isLoading || conversationComplete}
         />
         <button
           className={`w-full sm:w-auto px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors ${
-            isLoading || !input.trim()
+            isLoading || !input.trim() || conversationComplete
               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
               : "bg-blue-600 text-white hover:bg-blue-700"
           }`}
           onClick={sendMessage}
-          disabled={isLoading || !input.trim()}
+          disabled={isLoading || !input.trim() || conversationComplete}
         >
           {isLoading ? "..." : "Send"}
         </button>
       </div>
+
+      {conversationComplete && (
+        <button
+          onClick={resetConversation}
+          className="mt-4 w-full px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold"
+        >
+          🔄 Start New Request
+        </button>
+      )}
     </div>
   );
 }

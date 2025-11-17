@@ -60,7 +60,8 @@ app.post("/api/analyze-email", async (req, res) => {
   try {
     const response = await retryWithBackoff(async () => {
       return await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        // In ALL your routes, change the model:
+        model: "gemini-1.5-flash", // ← Changed from gemini-2.5-flash
         contents: `You are a data extraction assistant. Extract factual information from this quote email. Do NOT provide ratings or opinions.
 
 REQUIRED OUTPUT FORMAT (valid JSON only, no markdown):
@@ -123,174 +124,230 @@ OUTPUT (valid JSON only):`,
 });
 
 // --- ROUTE 2: Generate Questions for RFQ (Smarter Conversation Flow) ---
+// --- In-memory conversation state (temporary, during active chat) ---
+const conversations = new Map();
+
 app.post("/start", async (req, res) => {
-  const { description, previousAnswer } = req.body;
+  const { description, briefingId } = req.body;
 
   if (!description?.trim()) {
     return res.status(400).json({ error: "Description is required" });
   }
 
-  // 🔍 Detect unclear or off-topic answers before hitting the model
-  const unclearPatterns = [
-    /what do you mean/i,
-    /not sure/i,
-    /idk/i,
-    /no idea/i,
-    /huh/i,
-    /can you explain/i,
-  ];
-
-  if (previousAnswer && unclearPatterns.some((r) => r.test(previousAnswer))) {
-    return res.json({
-      message:
-        "No worries! I just meant — can you describe briefly what kind of product or service you're looking for?",
-      questions: ["What kind of product or service do you need?"],
-    });
+  if (!briefingId) {
+    return res.status(400).json({ error: "Briefing ID is required" });
   }
 
   try {
-    console.log("📝 Generating smarter questions for:", description);
+    console.log("🚀 Starting new conversation for briefing:", briefingId);
 
+    // Initialize conversation state
+    conversations.set(briefingId, {
+      history: [],
+      description: description,
+      briefingId: briefingId
+    });
+
+    // Generate first question
     const response = await retryWithBackoff(async () => {
       return await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: `
-You are an intelligent assistant helping a buyer prepare a quote request for suppliers.
+A user wants to create an RFQ (Request for Quote) for: "${description}"
 
-USER INPUT:
-"${description}"
+Generate ONE specific, conversational question to start gathering details for their quote request.
+Be professional but friendly.
 
-YOUR TASK:
-1. Generate 6–8 specific questions to gather all info needed for a quote request.
-2. If any user answer seems vague or unclear, you must clarify it instead of skipping ahead.
-3. Each question should be focused, conversational, and professional.
-
-RULES:
-- Ask ONE thing per question.
-- Be friendly but efficient.
-- Avoid repeating info already mentioned by the user.
-- Assume you’re talking to a human — use natural phrasing.
-
-RETURN FORMAT:
-A valid JSON array, e.g.:
-["Question 1?", "Question 2?", "Question 3?"]
-
-OUTPUT ONLY THE JSON ARRAY.`,
+RETURN ONLY THE QUESTION AS PLAIN TEXT (no JSON, no formatting).
+`,
       });
     });
 
-    console.log("🤖 AI raw response:", response.text);
+    const firstQuestion = response.text.trim().replace(/["\[\]]/g, '');
+    
+    // Save question to conversation history
+    conversations.get(briefingId).history.push({
+      role: "assistant",
+      content: firstQuestion
+    });
 
-    let questions = [];
-
-    try {
-      const jsonMatch = response.text.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        questions = JSON.parse(jsonMatch[0]);
-      }
-    } catch (parseError) {
-      console.log("⚠️ JSON parse failed, using fallback extraction");
-    }
-
-    if (!questions.length) {
-      questions = response.text
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line.includes("?") && line.length > 10)
-        .map((line) =>
-          line
-            .replace(/^\d+[\.\)]\s*/, "")
-            .replace(/^[-*]\s*/, "")
-            .replace(/["']/g, "")
-            .trim()
-        );
-    }
-
-    // Fallback if model gives junk
-    if (questions.length < 6) {
-      const fallbackQuestions = [
-        "What specific product or service do you need?",
-        "What quantity do you need?",
-        "When do you need it delivered?",
-        "Where should it be delivered?",
-        "Do you have any specific quality or technical requirements?",
-        "What is your budget range for this?",
-        "Do you have preferred brands or suppliers?",
-        "Any other important details I should include?",
-      ];
-      while (questions.length < 6) {
-        const fallback = fallbackQuestions[questions.length];
-        if (fallback && !questions.includes(fallback)) {
-          questions.push(fallback);
-        }
-      }
-    }
-
-    console.log("✅ Final questions:", questions);
+    console.log("✅ First question generated:", firstQuestion);
 
     res.json({
-      message:
-        "Great! Let me ask you a few questions to create the perfect quote request:",
-      questions,
+      question: firstQuestion,
+      briefingId: briefingId
     });
+
   } catch (error) {
-    console.error("❌ Error generating questions:", error);
-    res.status(500).json({
-      error:
-        error.status === 503
-          ? "AI service is temporarily overloaded. Please try again later."
-          : "Failed to generate questions",
-      details: error.message,
+    console.error("❌ Error starting conversation:", error);
+    res.status(500).json({ 
+      error: "Failed to start conversation",
+      details: error.message 
     });
   }
 });
 
+// --- ROUTE 2: Get Next Question (Based on User Answer) ---
+app.post("/next-question", async (req, res) => {
+  const { briefingId, userAnswer } = req.body;
 
-// --- ROUTE 3: Generate Quote Request Email ---
-app.post("/compose-email", async (req, res) => {
-  const { answers, initialDescription } = req.body;
-
-  if (!answers || !Array.isArray(answers)) {
-    return res.status(400).json({ error: "Answers array is required" });
+  if (!briefingId) {
+    return res.status(400).json({ error: "Briefing ID is required" });
   }
 
-  if (answers.length === 0) {
-    return res.status(400).json({ error: "At least one answer is required" });
+  if (!userAnswer?.trim()) {
+    return res.status(400).json({ error: "User answer is required" });
   }
 
   try {
-    console.log("📧 Generating email from answers:", answers);
+    // Get conversation state
+    let conversation = conversations.get(briefingId);
+    
+    if (!conversation) {
+      return res.status(404).json({ 
+        error: "Conversation not found. Please start a new conversation." 
+      });
+    }
+
+    console.log("💬 Processing answer for briefing:", briefingId);
+
+    // Add user's answer to history
+    conversation.history.push({
+      role: "user",
+      content: userAnswer
+    });
+
+    // Build conversation context
+    const conversationContext = conversation.history
+      .map(msg => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+      .join("\n");
+
+    // Generate next question or check if complete
+    const response = await retryWithBackoff(async () => {
+      return await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `
+You are helping a buyer prepare an RFQ (Request for Quote).
+
+INITIAL REQUEST: "${conversation.description}"
+
+CONVERSATION SO FAR:
+${conversationContext}
+
+YOUR TASK:
+1. Review the conversation history above carefully
+2. Analyze if the user's last answer was clear and complete
+3. Determine what critical information is still missing for a complete RFQ
+
+REQUIRED INFORMATION CHECKLIST (must have ALL):
+✓ Product/service name and specifications
+✓ Quantity or volume needed
+✓ Delivery timeline or deadline
+✓ Delivery location/address
+✓ Quality standards or technical requirements
+✓ Budget range (if mentioned)
+✓ Any other special requirements
+
+DECISION LOGIC:
+- If the last answer was vague, unclear, or off-topic → ask for clarification
+- If the last answer was good but info is incomplete → ask the next most important missing detail
+- If you have ALL essential information above → respond with exactly: COMPLETE
+
+RULES:
+- Generate ONLY ONE question at a time
+- Be conversational and natural
+- Never ask about information already clearly provided
+- If ready to finish, return ONLY the word: COMPLETE
+
+RETURN: Either ONE question as plain text, OR the word "COMPLETE" (no quotes, no formatting).
+`,
+      });
+    });
+
+    const aiResponse = response.text.trim().replace(/["\[\]]/g, '');
+    console.log("🤖 AI Response:", aiResponse);
+
+    // Check if conversation is complete
+    if (aiResponse.toUpperCase().includes("COMPLETE")) {
+      console.log("✅ Conversation complete for briefing:", briefingId);
+      
+      // Extract collected information
+      const collectedInfo = {
+        description: conversation.description,
+        conversationHistory: conversation.history
+      };
+
+      // Clean up temporary conversation state
+      conversations.delete(briefingId);
+
+      return res.json({
+        done: true,
+        message: "Great! I have all the information I need.",
+        collectedInfo: collectedInfo
+      });
+    }
+
+    // Save next question to history
+    conversation.history.push({
+      role: "assistant",
+      content: aiResponse
+    });
+
+    // Update conversation in memory
+    conversations.set(briefingId, conversation);
+
+    console.log("❓ Next question:", aiResponse);
+
+    res.json({
+      question: aiResponse,
+      briefingId: briefingId
+    });
+
+  } catch (error) {
+    console.error("❌ Error generating next question:", error);
+    res.status(500).json({ 
+      error: "Failed to generate next question",
+      details: error.message 
+    });
+  }
+});
+// --- ROUTE 3: Generate Quote Request Email ---
+app.post("/compose-email", async (req, res) => {
+  const { briefingId, collectedInfo } = req.body;
+
+  if (!collectedInfo) {
+    return res.status(400).json({ error: "Collected info is required" });
+  }
+
+  try {
+    console.log("📧 Composing email for briefing:", briefingId);
+
+    const conversationHistory = collectedInfo.conversationHistory
+      .map(msg => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+      .join("\n");
 
     const response = await retryWithBackoff(
       async () => {
         return await ai.models.generateContent({
           model: "gemini-2.5-flash",
-          contents: `You are writing a professional quote request email to send to suppliers.
+          contents: `
+Create a professional RFQ (Request for Quote) email based on this conversation:
 
-ANSWERS PROVIDED:
-${answers.map((a, i) => `${i + 1}. ${a}`).join("\n")}
+INITIAL REQUEST: ${collectedInfo.description}
 
-TASK:
-Write a clear, professional email requesting a quote that includes ALL the information from the answers above.
+CONVERSATION:
+${conversationHistory}
 
-EMAIL STRUCTURE:
-1. Subject line (specific and clear)
+Generate a complete, professional email that includes:
+1. A clear subject line (format: "Subject: ...")
 2. Professional greeting
-3. Brief introduction (1-2 sentences about what you need)
-4. Detailed requirements section with:
-   - Product/service description
-   - Specifications (size, color, material, technical details)
-   - Quantity
-   - Quality requirements
-   - Delivery timeline
-   - Delivery location
-   - Any other relevant details
-5. What you need in their quote:
-   - Price (unit and total)
-   - Lead time
-   - Payment terms
-   - Warranty information
-6. Professional closing with call to action
+3. Brief introduction
+4. Detailed requirements extracted from the conversation
+5. Specific questions or clarifications needed
+6. Request for quote with timeline
+7. Professional closing with signature placeholder
+
+Make it formal, clear, and ready to send to suppliers.
 
 TONE & STYLE:
 - Professional but friendly
@@ -299,20 +356,16 @@ TONE & STYLE:
 - Natural sounding (like a real person wrote it)
 - No placeholders like [Your Name] - leave signature blank for user to fill
 
-FORMAT:
-Subject: [write the subject line]
-
-[email body]
-
-Return ONLY the email text. No explanations, no markdown code blocks, no notes to the user.`,
+RETURN THE COMPLETE EMAIL (including subject line). No markdown code blocks.
+`,
         });
       },
       4,
       2000
-    ); // 4 retries with 2 second base delay for email generation
+    );
 
     let email = response.text.trim();
-    email = email.replace(/```[\s\S]*?\n/g, "").replace(/```/g, "");
+    email = email.replace(/``````/g, "");
 
     console.log("✅ Email generated successfully");
 
@@ -320,6 +373,7 @@ Return ONLY the email text. No explanations, no markdown code blocks, no notes t
       email: email,
       message: "Email ready! You can copy and send it to suppliers.",
     });
+
   } catch (error) {
     console.error("❌ Error generating email:", error);
     res.status(500).json({
@@ -330,15 +384,6 @@ Return ONLY the email text. No explanations, no markdown code blocks, no notes t
       details: error.message,
     });
   }
-});
-
-// --- Error handling middleware ---
-app.use((err, req, res, next) => {
-  console.error("💥 Unhandled error:", err);
-  res.status(500).json({
-    error: "Internal server error",
-    details: err.message,
-  });
 });
 
 // --- Start server ---
