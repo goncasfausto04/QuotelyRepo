@@ -7,6 +7,7 @@ export default function BriefingChat({
   onSuppliersFound,
 }) {
   const [briefingId, setBriefingId] = useState(initialBriefingId || null);
+  const API_URL = process.env.REACT_APP_API_URL;
   const [messages, setMessages] = useState([
     {
       role: "AI",
@@ -85,7 +86,7 @@ export default function BriefingChat({
       if (!isConversationStarted) {
         console.log("Starting new conversation with:", userInput);
 
-        const response = await fetch("http://localhost:3001/start", {
+        const response = await fetch(`${API_URL}/start`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -117,7 +118,7 @@ export default function BriefingChat({
       // CASE 2: Continuing the conversation (subsequent answers)
       console.log("Sending answer:", userInput);
 
-      const response = await fetch("http://localhost:3001/next-question", {
+      const response = await fetch(`${API_URL}/next-question`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -145,7 +146,7 @@ export default function BriefingChat({
         });
 
         // Call email composition endpoint
-        const emailRes = await fetch("http://localhost:3001/compose-email", {
+        const emailRes = await fetch(`${API_URL}/compose-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

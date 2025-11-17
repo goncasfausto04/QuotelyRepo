@@ -6,6 +6,7 @@ export default function QuoteAnalysis({ briefingId }) {
   const [text, setText] = useState("");
   const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(false);
+  const API_URL = process.env.REACT_APP_API_URL;
 
   const handleAnalyze = async () => {
     if (!text.trim()) {
@@ -23,7 +24,7 @@ export default function QuoteAnalysis({ briefingId }) {
 
     try {
       // 🔹 1. Send email text to your AI backend for analysis
-      const res = await fetch("http://localhost:3001/api/analyze-email", {
+      const res = await fetch(`${API_URL}/api/analyze-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emailText: text }),

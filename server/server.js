@@ -61,7 +61,7 @@ app.post("/api/analyze-email", async (req, res) => {
     const response = await retryWithBackoff(async () => {
       return await ai.models.generateContent({
         // In ALL your routes, change the model:
-        model: "gemini-1.5-flash", // ← Changed from gemini-2.5-flash
+        model: "gemini-2.5-flash", // ← Changed from gemini-2.5-flash
         contents: `You are a data extraction assistant. Extract factual information from this quote email. Do NOT provide ratings or opinions.
 
 REQUIRED OUTPUT FORMAT (valid JSON only, no markdown):
