@@ -67,7 +67,8 @@ const Briefings = () => {
     }
   };
 
-  const handleEdit = (briefing) => {
+  const handleEdit = (briefing, e) => {
+    e.stopPropagation(); // Prevent row click
     setEditingId(briefing.id);
     setEditingTitle(briefing.title || "");
   };
@@ -106,7 +107,8 @@ const Briefings = () => {
     setEditingTitle("");
   };
 
-  const handleDeleteClick = (briefing) => {
+  const handleDeleteClick = (briefing, e) => {
+    e.stopPropagation(); // Prevent row click
     setDeleteConfirm(briefing);
   };
 
@@ -153,9 +155,15 @@ const Briefings = () => {
     window.location.href = "/briefings/create-briefing";
   };
 
+  const handleRowClick = (briefingId) => {
+    if (editingId === null) {
+      handleViewBriefing(briefingId);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="flex-1 p-8 flex items-center justify-center">
+      <div className="flex-1 p-8 flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading briefings...</p>
@@ -167,7 +175,7 @@ const Briefings = () => {
   return (
     <div className="flex-1 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-6">
+      <div className="bg-white border-b border-gray-200 px-8 py-6 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">My Briefings</h1>
@@ -177,7 +185,7 @@ const Briefings = () => {
           </div>
           <button
             onClick={handleCreateBriefing}
-            className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg"
+            className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg hover:scale-105 transform duration-200"
           >
             <Plus size={20} />
             New Briefing
@@ -189,7 +197,7 @@ const Briefings = () => {
       <div className="max-w-7xl mx-auto p-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 mb-1">Total Briefings</p>
@@ -203,7 +211,7 @@ const Briefings = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 mb-1">Active</p>
@@ -217,7 +225,7 @@ const Briefings = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 mb-1">Total Quotes</p>
@@ -248,13 +256,14 @@ const Briefings = () => {
         </div>
 
         {/* Briefings Table */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
             <h2 className="text-lg font-semibold text-gray-900">
               All Briefings
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-              View, edit, and manage your briefing requests
+              Click on any row to view details, or use actions to edit and
+              delete
             </p>
           </div>
 
@@ -272,7 +281,7 @@ const Briefings = () => {
               </p>
               <button
                 onClick={handleCreateBriefing}
-                className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg"
               >
                 <Plus size={20} />
                 Create Your First Briefing
@@ -304,16 +313,24 @@ const Briefings = () => {
                   {briefings.map((briefing) => (
                     <tr
                       key={briefing.id}
-                      className="hover:bg-gray-50 transition-colors"
+                      onClick={() => handleRowClick(briefing.id)}
+                      className={`transition-all duration-150 ${
+                        editingId === briefing.id
+                          ? "bg-blue-50"
+                          : "hover:bg-gray-50 cursor-pointer"
+                      }`}
                     >
                       <td className="px-6 py-4">
                         {editingId === briefing.id ? (
-                          <div className="flex items-center gap-2">
+                          <div
+                            className="flex items-center gap-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <input
                               type="text"
                               value={editingTitle}
                               onChange={(e) => setEditingTitle(e.target.value)}
-                              className="flex-1 px-3 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                              className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === "Enter")
@@ -323,28 +340,33 @@ const Briefings = () => {
                             />
                             <button
                               onClick={() => handleSaveEdit(briefing.id)}
-                              className="p-1 text-green-600 hover:bg-green-50 rounded"
+                              className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-colors"
                               title="Save"
                             >
                               <Check size={18} />
                             </button>
                             <button
                               onClick={handleCancelEdit}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                              className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
                               title="Cancel"
                             >
                               <X size={18} />
                             </button>
                           </div>
                         ) : (
-                          <div className="text-sm font-medium text-gray-900">
-                            {briefing.title || "Untitled Briefing"}
+                          <div className="flex items-center gap-3">
+                            <div className="bg-blue-100 rounded-lg p-2">
+                              <FileText className="text-blue-600" size={16} />
+                            </div>
+                            <span className="text-sm font-medium text-gray-900">
+                              {briefing.title || "Untitled Briefing"}
+                            </span>
                           </div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border capitalize ${getStatusColor(
                             briefing.status || "draft"
                           )}`}
                         >
@@ -362,32 +384,38 @@ const Briefings = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-semibold text-gray-900">
-                          {quoteCounts[briefing.id] || 0}
-                        </span>
-                        <span className="text-sm text-gray-500 ml-1">
-                          quotes
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-600 text-sm font-semibold">
+                            {quoteCounts[briefing.id] || 0}
+                          </span>
+                          <span className="text-sm text-gray-500">quotes</span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex justify-end gap-2">
+                        <div
+                          className="flex justify-end gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <button
-                            onClick={() => handleViewBriefing(briefing.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewBriefing(briefing.id);
+                            }}
                             className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
                             title="View briefing"
                           >
                             <Eye size={18} />
                           </button>
                           <button
-                            onClick={() => handleEdit(briefing)}
-                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+                            onClick={(e) => handleEdit(briefing, e)}
+                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Edit title"
                             disabled={editingId !== null}
                           >
                             <Edit2 size={18} />
                           </button>
                           <button
-                            onClick={() => handleDeleteClick(briefing)}
+                            onClick={(e) => handleDeleteClick(briefing, e)}
                             className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
                             title="Delete briefing"
                           >
@@ -406,33 +434,36 @@ const Briefings = () => {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-start gap-4 mb-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+            <div className="flex items-start gap-4 mb-6">
               <div className="bg-red-100 rounded-full p-3">
                 <AlertCircle className="text-red-600" size={24} />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   Delete Briefing?
                 </h3>
                 <p className="text-sm text-gray-600">
-                  Are you sure you want to delete "
-                  {deleteConfirm.title || "this briefing"}"? This action cannot
-                  be undone and will also delete all associated quotes.
+                  Are you sure you want to delete{" "}
+                  <span className="font-medium text-gray-900">
+                    "{deleteConfirm.title || "this briefing"}"
+                  </span>
+                  ? This action cannot be undone and will also delete all
+                  associated quotes.
                 </p>
               </div>
             </div>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm"
               >
                 Delete Briefing
               </button>

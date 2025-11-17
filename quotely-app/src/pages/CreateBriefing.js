@@ -23,24 +23,32 @@ export default function CreateBriefing() {
       return;
     }
 
-    const { error } = await supabase.from("briefings").insert([
-      {
-        user_auth_id: user.id,
-        title,
-        category,
-        status: "draft",
-      },
-    ]);
+    // Add .select() to get the inserted data back
+    const { data, error: insertError } = await supabase
+      .from("briefings")
+      .insert([
+        {
+          user_auth_id: user.id,
+          title,
+          category,
+          status: "draft",
+        },
+      ])
+      .select(); // This returns the inserted record
 
     setLoading(false);
 
-    if (error) {
-      setError(error.message);
+    if (insertError) {
+      setError(insertError.message);
       return;
     }
 
-    // redirect to briefings list
-    navigate("/briefings");
+    // Get the ID from the inserted data
+    if (data && data.length > 0) {
+      const id = data[0].id;
+      // Use backticks for template literals, not quotes
+      navigate(`/briefingpage?briefing=${id}`);
+    }
   };
 
   return (
