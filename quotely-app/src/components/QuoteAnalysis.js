@@ -427,16 +427,16 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
           <div className="flex flex-col items-end gap-2">
             {briefingId && (
               <>
-                <p className="text-sm text-blue-600">
+                <p className="text-sm text-blue-600 dark:text-blue-400">
                   📎 Briefing: {briefingId.slice(0, 8)}...
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   {existingQuotes.length} quote
                   {existingQuotes.length !== 1 ? "s" : ""}
                 </p>
                 <button
                   onClick={generateSupplierLink}
-                  className="flex items-center gap-2 px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
+                  className="flex items-center gap-2 px-3 py-1 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-800 transition text-sm"
                 >
                   <LinkIcon size={14} />
                   Generate Supplier Link
@@ -456,13 +456,13 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
             </h3>
 
             {/* Input Mode Selector */}
-            <div className="flex gap-2 mb-6 border-b border-gray-200 pb-4">
+            <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-700 pb-4">
               <button
                 onClick={() => setInputMode("email")}
                 className={`flex-1 py-2 px-4 rounded-lg transition ${
                   inputMode === "email"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    ? "bg-blue-600 dark:bg-blue-700 text-white"
+                    : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                 }`}
               >
                 <FileText size={16} className="inline mr-2" />
@@ -472,8 +472,8 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                 onClick={() => setInputMode("pdf")}
                 className={`flex-1 py-2 px-4 rounded-lg transition ${
                   inputMode === "pdf"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    ? "bg-blue-600 dark:bg-blue-700 text-white"
+                    : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                 }`}
               >
                 <Upload size={16} className="inline mr-2" />
@@ -483,8 +483,8 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                 onClick={() => setInputMode("manual")}
                 className={`flex-1 py-2 px-4 rounded-lg transition ${
                   inputMode === "manual"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    ? "bg-blue-600 dark:bg-blue-700 text-white"
+                    : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                 }`}
               >
                 ✍️ Manual
@@ -506,8 +506,8 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                   disabled={loading || !text.trim()}
                   className={`w-full py-3 px-4 rounded-lg font-semibold transition ${
                     loading || !text.trim()
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
+                      ? "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-800"
                   }`}
                 >
                   {loading ? "Analyzing..." : "🔍 Analyze Email"}
@@ -518,7 +518,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
             {/* PDF Input */}
             {inputMode === "pdf" && (
               <div className="space-y-4">
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg p-6 text-center">
                   <input
                     type="file"
                     accept="application/pdf"
@@ -530,11 +530,16 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                     htmlFor="pdf-upload"
                     className="cursor-pointer flex flex-col items-center"
                   >
-                    <Upload size={48} className="text-gray-400 mb-2" />
-                    <p className="text-gray-600">
+                    <Upload
+                      size={48}
+                      className="text-gray-400 dark:text-gray-500 mb-2"
+                    />
+                    <p className="text-gray-600 dark:text-gray-300">
                       {pdfFile ? pdfFile.name : "Click to upload PDF"}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">Max 10MB</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      Max 10MB
+                    </p>
                   </label>
                 </div>
                 <button
@@ -542,8 +547,8 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                   disabled={loading || !pdfFile}
                   className={`w-full py-3 px-4 rounded-lg font-semibold transition ${
                     loading || !pdfFile
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
+                      ? "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-800"
                   }`}
                 >
                   {loading ? "Analyzing PDF..." : "🔍 Analyze PDF"}
@@ -564,7 +569,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                       supplier_name: e.target.value,
                     })
                   }
-                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <input
@@ -577,7 +582,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                         contact_email: e.target.value,
                       })
                     }
-                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   />
                   <input
                     type="tel"
@@ -589,7 +594,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                         contact_phone: e.target.value,
                       })
                     }
-                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-3">
@@ -603,14 +608,14 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                         total_price: e.target.value,
                       })
                     }
-                    className="col-span-2 w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                    className="col-span-2 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   />
                   <select
                     value={manualData.currency}
                     onChange={(e) =>
                       setManualData({ ...manualData, currency: e.target.value })
                     }
-                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   >
                     <option value="USD">USD</option>
                     <option value="EUR">EUR</option>
@@ -628,7 +633,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                         lead_time_days: e.target.value,
                       })
                     }
-                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   />
                   <input
                     type="number"
@@ -640,7 +645,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                         warranty_months: e.target.value,
                       })
                     }
-                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   />
                 </div>
                 <input
@@ -653,7 +658,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                       payment_terms: e.target.value,
                     })
                   }
-                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
                 <textarea
                   rows={3}
@@ -662,7 +667,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                   onChange={(e) =>
                     setManualData({ ...manualData, notes: e.target.value })
                   }
-                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
                 <button
                   onClick={handleManualSubmit}
@@ -675,8 +680,8 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                     loading ||
                     !manualData.supplier_name ||
                     !manualData.total_price
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
+                      ? "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-800"
                   }`}
                 >
                   {loading ? "Saving..." : "💾 Save Quote"}
@@ -686,11 +691,11 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
 
             {/* Feedback Messages */}
             {feedback && !feedback.error && !savedQuote && (
-              <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-900 mb-3">
+              <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-200 mb-3">
                   👀 Analysis Preview
                 </h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-2 gap-3 text-sm text-gray-700 dark:text-gray-300">
                   <div>
                     <span className="font-medium">Supplier:</span>{" "}
                     {feedback.supplier_name || "—"}
@@ -706,21 +711,21 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
             )}
 
             {savedQuote && (
-              <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="mt-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                 <div className="flex items-center gap-3">
                   <CheckCircle
-                    className="text-green-600 flex-shrink-0"
+                    className="text-green-600 dark:text-green-400 flex-shrink-0"
                     size={20}
                   />
                   <div>
-                    <h4 className="font-semibold text-green-800">
+                    <h4 className="font-semibold text-green-800 dark:text-green-200">
                       Quote Saved Successfully!
                     </h4>
                   </div>
                 </div>
                 <button
                   onClick={resetForm}
-                  className="mt-3 w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+                  className="mt-3 w-full py-2 bg-green-600 dark:bg-green-700 text-white rounded hover:bg-green-700 dark:hover:bg-green-800 transition"
                 >
                   Add Another Quote
                 </button>
@@ -728,15 +733,19 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
             )}
 
             {feedback?.error && (
-              <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="mt-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                 <div className="flex items-center gap-3">
                   <AlertCircle
-                    className="text-red-600 flex-shrink-0"
+                    className="text-red-600 dark:text-red-400 flex-shrink-0"
                     size={20}
                   />
                   <div>
-                    <h4 className="font-semibold text-red-900">Error</h4>
-                    <p className="text-red-700 text-sm">{feedback.error}</p>
+                    <h4 className="font-semibold text-red-900 dark:text-red-200">
+                      Error
+                    </h4>
+                    <p className="text-red-700 dark:text-red-300 text-sm">
+                      {feedback.error}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -784,7 +793,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                       <h4 className="font-semibold text-gray-800 dark:text-white">
                         {quote.supplier_name || "Unknown Supplier"}
                       </h4>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {new Date(quote.created_at).toLocaleDateString()} •
                         {quote.input_method === "email" && " 📧 Email"}
                         {quote.input_method === "pdf" && " 📄 PDF"}
@@ -798,13 +807,13 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                       onClick={() =>
                         confirmDelete(quote.id, quote.supplier_name)
                       }
-                      className="text-red-500 hover:text-red-700 transition"
+                      className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition"
                     >
                       <Trash2 size={16} />
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
                     <div>
                       <span className="font-medium">Price:</span>{" "}
                       {quote.total_price
@@ -826,14 +835,14 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                           JSON.stringify(quote.analysis_json, null, 2)
                         )
                       }
-                      className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 transition"
+                      className="flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs hover:bg-blue-200 dark:hover:bg-blue-900/50 transition"
                     >
                       <Copy size={12} />
                       Copy
                     </button>
                     <button
                       onClick={() => (window.location.href = "/briefingpage")}
-                      className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 transition"
+                      className="flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs hover:bg-green-200 dark:hover:bg-green-900/50 transition"
                     >
                       <Eye size={12} />
                       Compare
@@ -847,7 +856,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
           {existingQuotes.length > 0 && (
             <button
               onClick={() => (window.location.href = "/briefingpage")}
-              className="w-full mt-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
+              className="w-full mt-6 py-3 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition font-semibold"
             >
               📊 Go to Comparison Dashboard
             </button>
