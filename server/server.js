@@ -816,25 +816,38 @@ app.post("/api/supplier-submit-quote", async (req, res) => {
     console.log("✅ Token verified, briefing ID:", briefing.id);
     console.log("💾 Inserting quote into database...");
 
-    // Insert quote
+    // ✅ FIX: Safely parse numbers and handle empty strings
+    const parseNumber = (val) => {
+      if (val === null || val === undefined || val === '') return null;
+      const num = parseFloat(val);
+      return isNaN(num) ? null : num;
+    };
+
+    const parseInt = (val) => {
+      if (val === null || val === undefined || val === '') return null;
+      const num = Number.parseInt(val);
+      return isNaN(num) ? null : num;
+    };
+
+    // Insert quote with safe parsing
     const { data: insertedQuote, error: insertError } = await supabase
       .from("quotes")
       .insert({
         briefing_id: briefing.id,
-        supplier_name: quoteData.supplier_name,
-        contact_email: quoteData.contact_email,
-        contact_phone: quoteData.contact_phone,
-        total_price: quoteData.total_price,
+        supplier_name: quoteData.supplier_name || null,
+        contact_email: quoteData.contact_email || null,
+        contact_phone: quoteData.contact_phone || null,
+        total_price: parseNumber(quoteData.total_price),
         currency: quoteData.currency || "USD",
-        unit_price: quoteData.unit_price,
-        quantity: quoteData.quantity,
-        lead_time_days: quoteData.lead_time_days,
-        delivery_date: quoteData.delivery_date,
-        payment_terms: quoteData.payment_terms,
-        warranty_period: quoteData.warranty_period,
-        warranty_months: quoteData.warranty_months,
-        shipping_cost: quoteData.shipping_cost,
-        notes: quoteData.notes,
+        unit_price: parseNumber(quoteData.unit_price),
+        quantity: parseInt(quoteData.quantity),
+        lead_time_days: parseInt(quoteData.lead_time_days),
+        delivery_date: quoteData.delivery_date || null,
+        payment_terms: quoteData.payment_terms || null,
+        warranty_period: quoteData.warranty_period || null,
+        warranty_months: parseInt(quoteData.warranty_months),
+        shipping_cost: parseNumber(quoteData.shipping_cost),
+        notes: quoteData.notes || null,
         input_method: "manual_supplier",
         submitted_by: "supplier",
         analysis_json: quoteData,
@@ -843,7 +856,8 @@ app.post("/api/supplier-submit-quote", async (req, res) => {
       .single();
 
     if (insertError) {
-      console.error("❌ Database insert error:", insertError.message);
+      console.error("❌ Database insert error:", insertError);
+      console.error("❌ Insert error details:", JSON.stringify(insertError, null, 2));
       throw insertError;
     }
 
@@ -856,9 +870,14 @@ app.post("/api/supplier-submit-quote", async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error submitting supplier quote:", error.message);
-    res.status(500).json({ error: "Failed to submit quote" });
+    console.error("❌ Full error:", error);
+    res.status(500).json({ 
+      error: "Failed to submit quote",
+      details: error.message 
+    });
   }
 });
+
 
 // Start server
 const PORT = process.env.PORT || 3001;
