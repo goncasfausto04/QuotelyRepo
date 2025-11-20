@@ -8,6 +8,11 @@ import multer from "multer";
 import { randomBytes } from "crypto";
 
 dotenv.config();
+console.log("🔍 FRONTEND_URL:", process.env.FRONTEND_URL);
+console.log(
+  "🔍 All env vars:",
+  Object.keys(process.env).filter((k) => k.includes("FRONTEND"))
+);
 
 // Validate environment variables
 const requiredEnvVars = [
