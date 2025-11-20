@@ -6,7 +6,7 @@ export default function Footer() {
           {/* Logo */}
           <div className="flex items-center gap-2">
             <img
-              src="/whitelogo.jpg"
+              src="/blacklogo.jpg"
               alt="Quotely Logo"
               className="w-6 h-6 object-contain rounded-lg border border-gray-200 dark:border-gray-700"
             />
