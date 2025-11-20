@@ -111,13 +111,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-6"
-      style={{
-        background:
-          "linear-gradient(0deg, rgba(244, 244, 246, 0.3), rgba(244, 244, 246, 0.3)), #F9F8F6",
-      }}
-    >
+    <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50 dark:bg-gray-950">
       <div className="w-full max-w-4xl mx-auto">
         <div className="flex flex-col md:flex-row items-stretch gap-6">
           {/* Banner Image for md+ */}
@@ -139,7 +133,7 @@ export default function AuthPage() {
           </div>
 
           {/* Auth Card */}
-          <div className="w-full md:w-1/2 bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+          <div className="w-full md:w-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6">
             {/* Logo */}
             <div className="flex justify-center mb-6">
               <img
@@ -151,15 +145,12 @@ export default function AuthPage() {
 
             {/* Heading */}
             <h2
-              className="text-xl font-semibold text-center mb-1"
-              style={{ color: "#17171C", letterSpacing: "-0.6px" }}
+              className="text-xl font-semibold text-center mb-1 text-gray-900 dark:text-white"
+              style={{ letterSpacing: "-0.6px" }}
             >
               {isForgotPassword ? "Reset Password" : "Welcome to Quotely"}
             </h2>
-            <p
-              className="text-center text-sm mb-6"
-              style={{ color: "#797986" }}
-            >
+            <p className="text-center text-sm mb-6 text-gray-600 dark:text-gray-400">
               {isForgotPassword
                 ? "Enter your email to receive a reset link"
                 : "Turn briefings into smart decisions"}
@@ -167,15 +158,15 @@ export default function AuthPage() {
 
             {/* Tab List */}
             {!isForgotPassword && (
-              <div
-                className="rounded-md p-1 mb-6 flex"
-                style={{ background: "#F4F4F6" }}
-              >
+              <div className="rounded-md p-1 mb-6 flex bg-gray-100 dark:bg-gray-700">
                 <button
                   className={`flex-1 py-2 px-4 rounded text-sm font-semibold transition-all ${
-                    isLogin ? "bg-white shadow-sm" : ""
+                    isLogin ? "bg-white dark:bg-gray-600 shadow-sm" : ""
+                  } ${
+                    isLogin
+                      ? "text-gray-900 dark:text-white"
+                      : "text-gray-600 dark:text-gray-400"
                   }`}
-                  style={{ color: isLogin ? "#17171C" : "#797986" }}
                   onClick={() => {
                     setIsLogin(true);
                     setErrorMsg("");
@@ -188,9 +179,12 @@ export default function AuthPage() {
                 </button>
                 <button
                   className={`flex-1 py-2 px-4 rounded text-sm font-semibold transition-all ${
-                    !isLogin ? "bg-white shadow-sm" : ""
+                    !isLogin ? "bg-white dark:bg-gray-600 shadow-sm" : ""
+                  } ${
+                    !isLogin
+                      ? "text-gray-900 dark:text-white"
+                      : "text-gray-600 dark:text-gray-400"
                   }`}
-                  style={{ color: !isLogin ? "#17171C" : "#797986" }}
                   onClick={() => {
                     setIsLogin(false);
                     setErrorMsg("");
@@ -205,18 +199,12 @@ export default function AuthPage() {
 
             {/* Error/Success Messages */}
             {errorMsg && (
-              <div
-                className="mb-4 p-3 rounded-md text-sm"
-                style={{ background: "#FEE2E2", color: "#991B1B" }}
-              >
+              <div className="mb-4 p-3 rounded-md text-sm bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200">
                 {errorMsg}
               </div>
             )}
             {successMsg && (
-              <div
-                className="mb-4 p-3 rounded-md text-sm"
-                style={{ background: "#D1FAE5", color: "#065F46" }}
-              >
+              <div className="mb-4 p-3 rounded-md text-sm bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200">
                 {successMsg}
               </div>
             )}
@@ -225,7 +213,7 @@ export default function AuthPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
                     Name
                   </label>
                   <input
@@ -234,17 +222,14 @@ export default function AuthPage() {
                     placeholder="Your name"
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-500"
                     required
                   />
                 </div>
               )}
 
               <div>
-                <label
-                  className="block text-sm font-semibold mb-2"
-                  style={{ color: "#17171C" }}
-                >
+                <label className="block text-sm font-semibold mb-2 text-gray-900 dark:text-white">
                   Email
                 </label>
                 <input
@@ -253,18 +238,14 @@ export default function AuthPage() {
                   placeholder="your@email.com"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                  style={{ border: "1px solid #E3E3E8", color: "#797986" }}
+                  className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-500"
                   required
                 />
               </div>
 
               {!isForgotPassword && (
                 <div>
-                  <label
-                    className="block text-sm font-semibold mb-2"
-                    style={{ color: "#17171C" }}
-                  >
+                  <label className="block text-sm font-semibold mb-2 text-gray-900 dark:text-white">
                     Password
                   </label>
                   <input
@@ -273,8 +254,7 @@ export default function AuthPage() {
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleChange}
-                    className="w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                    style={{ border: "1px solid #E3E3E8", color: "#797986" }}
+                    className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-500"
                     required
                   />
                 </div>
@@ -282,7 +262,7 @@ export default function AuthPage() {
 
               {!isLogin && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
                     Confirm Password
                   </label>
                   <input
@@ -291,7 +271,7 @@ export default function AuthPage() {
                     placeholder="••••••••"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-500"
                     required
                   />
                   {passwordError && (
@@ -308,15 +288,14 @@ export default function AuthPage() {
                     !isForgotPassword &&
                     formData.password !== formData.confirmPassword)
                 }
-                className={`w-full text-white py-2 px-4 rounded-md text-sm font-semibold transition-all ${
+                className={`w-full bg-blue-700 dark:bg-blue-600 text-white py-2 px-4 rounded-md text-sm font-semibold transition-all ${
                   isLoading ||
                   (!isLogin &&
                     !isForgotPassword &&
                     formData.password !== formData.confirmPassword)
                     ? "opacity-50 cursor-not-allowed"
-                    : "hover:opacity-90"
+                    : "hover:bg-blue-800 dark:hover:bg-blue-700"
                 }`}
-                style={{ background: "#000099" }}
               >
                 {isLoading
                   ? "Loading..."
@@ -336,8 +315,7 @@ export default function AuthPage() {
                     setErrorMsg("");
                     setSuccessMsg("");
                   }}
-                  className="text-sm font-medium hover:underline"
-                  style={{ color: "#000099" }}
+                  className="text-sm font-medium hover:underline text-blue-700 dark:text-blue-400"
                 >
                   ← Back to Sign In
                 </button>
@@ -352,8 +330,7 @@ export default function AuthPage() {
                     setErrorMsg("");
                     setSuccessMsg("");
                   }}
-                  className="text-sm font-medium hover:underline"
-                  style={{ color: "#000099" }}
+                  className="text-sm font-medium hover:underline text-blue-700 dark:text-blue-400"
                 >
                   Forgot Password?
                 </button>

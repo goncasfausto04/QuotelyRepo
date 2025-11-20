@@ -206,12 +206,12 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
     <div className="max-w-7xl mx-auto p-6 space-y-8">
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold text-gray-800 mb-2">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 max-w-md w-full border border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">
               Delete Quote?
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               Are you sure you want to delete the quote from{" "}
               <strong>
                 {showDeleteConfirm.supplierName || "Unknown Supplier"}
@@ -221,13 +221,13 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
             <div className="flex gap-3 justify-end">
               <button
                 onClick={cancelDelete}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
               >
                 Cancel
               </button>
               <button
                 onClick={deleteQuote}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                className="px-4 py-2 bg-red-600 dark:bg-red-700 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-800 transition"
               >
                 Delete Quote
               </button>
@@ -237,13 +237,13 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
       )}
 
       {/* Header */}
-      <div className="bg-white rounded-xl shadow-md p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-3xl font-bold text-gray-800">
+            <h2 className="text-3xl font-bold text-gray-800 dark:text-white">
               📧 Quote Analysis
             </h2>
-            <p className="text-gray-600 mt-2">
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
               Analyze supplier quotes and manage all your analyzed quotes in one
               place
             </p>
@@ -263,14 +263,14 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left Column - Analyze New Quote */}
         <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
               🔍 Analyze New Quote
             </h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Supplier Quote Email
                 </label>
                 <textarea
@@ -278,7 +278,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                   placeholder="Paste the complete email from the supplier here..."
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-3 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 font-mono text-sm"
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   {text.length} characters
@@ -404,15 +404,15 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
         </div>
 
         {/* Right Column - Existing Quotes */}
-        <div className="bg-white rounded-xl shadow-md p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold text-gray-800">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white">
               📋 Analyzed Quotes ({existingQuotes.length})
             </h3>
             <button
               onClick={refreshQuotes}
               disabled={loadingQuotes}
-              className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition text-sm"
             >
               <RefreshCw
                 size={16}
@@ -427,10 +427,10 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           ) : existingQuotes.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <div className="text-4xl mb-4">📭</div>
-              <p>No quotes analyzed yet</p>
-              <p className="text-sm mt-2">
+              <p className="dark:text-gray-400">No quotes analyzed yet</p>
+              <p className="text-sm mt-2 dark:text-gray-500">
                 Analyze your first quote to see it here
               </p>
             </div>
@@ -439,14 +439,14 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
               {existingQuotes.map((quote) => (
                 <div
                   key={quote.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 bg-white dark:bg-gray-800 transition"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h4 className="font-semibold text-gray-800">
+                      <h4 className="font-semibold text-gray-800 dark:text-white">
                         {quote.supplier_name || "Unknown Supplier"}
                       </h4>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {new Date(quote.created_at).toLocaleDateString()} •
                         {quote.contact_email ? ` ${quote.contact_email}` : ""}
                       </p>
@@ -464,8 +464,10 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
 
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <span className="font-medium text-gray-600">Price:</span>
-                      <span className="ml-2 text-gray-900">
+                      <span className="font-medium text-gray-600 dark:text-gray-400">
+                        Price:
+                      </span>
+                      <span className="ml-2 text-gray-900 dark:text-gray-100">
                         {quote.total_price
                           ? `${quote.currency || "USD"} ${quote.total_price}`
                           : "—"}

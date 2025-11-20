@@ -163,23 +163,27 @@ const Briefings = () => {
 
   if (loading) {
     return (
-      <div className="flex-1 p-8 flex items-center justify-center min-h-screen">
+      <div className="flex-1 p-8 flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading briefings...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">
+            Loading briefings...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 bg-gray-50 min-h-screen">
+    <div className="flex-1 bg-gray-50 dark:bg-gray-950 min-h-screen">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-6 shadow-sm">
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-8 py-6 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Briefings</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              My Briefings
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
               Manage and track all your quote requests
             </p>
           </div>
@@ -197,48 +201,60 @@ const Briefings = () => {
       <div className="max-w-7xl mx-auto p-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 mb-1">Total Briefings</p>
-                <p className="text-3xl font-bold text-gray-900">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                  Total Briefings
+                </p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">
                   {briefings.length}
                 </p>
               </div>
-              <div className="bg-blue-100 rounded-full p-3">
-                <FileText className="text-blue-600" size={24} />
+              <div className="bg-blue-100 dark:bg-blue-900/30 rounded-full p-3">
+                <FileText
+                  className="text-blue-600 dark:text-blue-400"
+                  size={24}
+                />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 mb-1">Active</p>
-                <p className="text-3xl font-bold text-green-600">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                  Active
+                </p>
+                <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                   {briefings.filter((b) => b.status === "active").length}
                 </p>
               </div>
-              <div className="bg-green-100 rounded-full p-3">
-                <Check className="text-green-600" size={24} />
+              <div className="bg-green-100 dark:bg-green-900/30 rounded-full p-3">
+                <Check
+                  className="text-green-600 dark:text-green-400"
+                  size={24}
+                />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 mb-1">Total Quotes</p>
-                <p className="text-3xl font-bold text-purple-600">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                  Total Quotes
+                </p>
+                <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
                   {Object.values(quoteCounts).reduce(
                     (sum, count) => sum + count,
                     0
                   )}
                 </p>
               </div>
-              <div className="bg-purple-100 rounded-full p-3">
+              <div className="bg-purple-100 dark:bg-purple-900/30 rounded-full p-3">
                 <svg
-                  className="w-6 h-6 text-purple-600"
+                  className="w-6 h-6 text-purple-600 dark:text-purple-400"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -256,12 +272,12 @@ const Briefings = () => {
         </div>
 
         {/* Briefings Table */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <h2 className="text-lg font-semibold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               All Briefings
             </h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Click on any row to view details, or use actions to edit and
               delete
             </p>
@@ -269,13 +285,13 @@ const Briefings = () => {
 
           {briefings.length === 0 ? (
             <div className="flex min-h-[400px] flex-col items-center justify-center text-center p-12">
-              <div className="bg-gray-100 rounded-full p-6 mb-4">
-                <FileText className="h-12 w-12 text-gray-400" />
+              <div className="bg-gray-100 dark:bg-gray-700 rounded-full p-6 mb-4">
+                <FileText className="h-12 w-12 text-gray-400 dark:text-gray-500" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                 No briefings yet
               </h3>
-              <p className="text-gray-600 mb-6 max-w-md">
+              <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md">
                 Create your first briefing to start receiving quotes from
                 suppliers. The AI will help you craft the perfect request.
               </p>
@@ -290,9 +306,9 @@ const Briefings = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Title
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -309,15 +325,15 @@ const Briefings = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {briefings.map((briefing) => (
                     <tr
                       key={briefing.id}
                       onClick={() => handleRowClick(briefing.id)}
                       className={`transition-all duration-150 ${
                         editingId === briefing.id
-                          ? "bg-blue-50"
-                          : "hover:bg-gray-50 cursor-pointer"
+                          ? "bg-blue-50 dark:bg-blue-900/20"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                       }`}
                     >
                       <td className="px-6 py-4">
@@ -330,7 +346,7 @@ const Briefings = () => {
                               type="text"
                               value={editingTitle}
                               onChange={(e) => setEditingTitle(e.target.value)}
-                              className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                              className="flex-1 px-3 py-2 border border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:outline-none"
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === "Enter")
@@ -355,10 +371,13 @@ const Briefings = () => {
                           </div>
                         ) : (
                           <div className="flex items-center gap-3">
-                            <div className="bg-blue-100 rounded-lg p-2">
-                              <FileText className="text-blue-600" size={16} />
+                            <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg p-2">
+                              <FileText
+                                className="text-blue-600 dark:text-blue-400"
+                                size={16}
+                              />
                             </div>
-                            <span className="text-sm font-medium text-gray-900">
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">
                               {briefing.title || "Untitled Briefing"}
                             </span>
                           </div>
@@ -373,7 +392,7 @@ const Briefings = () => {
                           {briefing.status || "draft"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
                         {new Date(briefing.created_at).toLocaleDateString(
                           "en-US",
                           {
@@ -385,10 +404,12 @@ const Briefings = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-600 text-sm font-semibold">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-sm font-semibold">
                             {quoteCounts[briefing.id] || 0}
                           </span>
-                          <span className="text-sm text-gray-500">quotes</span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            quotes
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -434,19 +455,22 @@ const Briefings = () => {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 transform transition-all border border-gray-200 dark:border-gray-700">
             <div className="flex items-start gap-4 mb-6">
-              <div className="bg-red-100 rounded-full p-3">
-                <AlertCircle className="text-red-600" size={24} />
+              <div className="bg-red-100 dark:bg-red-900/30 rounded-full p-3">
+                <AlertCircle
+                  className="text-red-600 dark:text-red-400"
+                  size={24}
+                />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                   Delete Briefing?
                 </h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   Are you sure you want to delete{" "}
-                  <span className="font-medium text-gray-900">
+                  <span className="font-medium text-gray-900 dark:text-white">
                     "{deleteConfirm.title || "this briefing"}"
                   </span>
                   ? This action cannot be undone and will also delete all
@@ -457,13 +481,13 @@ const Briefings = () => {
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm"
+                className="px-4 py-2 bg-red-600 dark:bg-red-700 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-800 transition-colors font-medium shadow-sm"
               >
                 Delete Briefing
               </button>
