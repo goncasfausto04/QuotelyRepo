@@ -111,13 +111,13 @@ function LocationInput({ onLocationSelect, selectedLocation }) {
 
   return (
     <div className="mb-4">
-      <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
         📍 Location
       </label>
       <div className="flex gap-1.5 mb-1.5">
         <input
           type="text"
-          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+          className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded focus:border-blue-500 dark:focus:border-blue-400 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           placeholder="Enter city..."
@@ -127,28 +127,34 @@ function LocationInput({ onLocationSelect, selectedLocation }) {
           type="button"
           onClick={handleUseMyLocation}
           disabled={loading}
-          className="px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+          className="px-3 py-2 bg-blue-600 dark:bg-blue-700 text-white text-xs rounded hover:bg-blue-700 dark:hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap"
         >
           📍
         </button>
       </div>
-      {loading && <p className="text-xs text-gray-500">Loading...</p>}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {loading && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">Loading...</p>
+      )}
+      {error && (
+        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
       {selectedLocation && (
-        <p className="text-xs text-green-600">✓ Location set</p>
+        <p className="text-xs text-green-600 dark:text-green-400">
+          ✓ Location set
+        </p>
       )}
       {!loading && suggestions.length > 0 && (
-        <ul className="absolute z-50 w-[350px] max-h-48 overflow-y-auto border border-gray-300 rounded bg-white shadow-lg mt-1">
+        <ul className="absolute z-50 w-[350px] max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 shadow-lg mt-1">
           {suggestions.map((place) => (
             <li
               key={place.place_id}
-              className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm border-b last:border-b-0"
+              className="px-3 py-2 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm border-b border-gray-200 dark:border-gray-700 last:border-b-0"
               onClick={() => handleSelect(place)}
             >
-              <div className="font-medium text-gray-800 truncate">
+              <div className="font-medium text-gray-800 dark:text-white truncate">
                 {place.display_name.split(",")[0]}
               </div>
-              <div className="text-xs text-gray-500 truncate">
+              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                 {place.display_name.split(",").slice(1, 3).join(",")}
               </div>
             </li>
@@ -362,8 +368,10 @@ export default function SupplierSearchPanel() {
           {!loading && !error && suppliers.length === 0 && (
             <div className="text-center py-6">
               <div className="text-3xl mb-2">😔</div>
-              <p className="text-xs text-gray-600">No suppliers found</p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-600 dark:text-gray-300">
+                No suppliers found
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Try increasing radius
               </p>
             </div>
@@ -372,7 +380,7 @@ export default function SupplierSearchPanel() {
           {suppliers.length > 0 && (
             <>
               <div className="mb-3">
-                <p className="text-xs font-semibold text-gray-700">
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
                   Found {suppliers.length} supplier
                   {suppliers.length !== 1 ? "s" : ""}
                 </p>
@@ -396,7 +404,7 @@ export default function SupplierSearchPanel() {
                     </div>
 
                     <div className="space-y-1 text-xs">
-                      <div className="flex items-start gap-1.5 text-gray-600">
+                      <div className="flex items-start gap-1.5 text-gray-600 dark:text-gray-300">
                         <span>📍</span>
                         <span className="flex-1 leading-tight">
                           {sup.address}
@@ -408,7 +416,7 @@ export default function SupplierSearchPanel() {
                           <span>📞</span>
                           <a
                             href={`tel:${sup.phone}`}
-                            className="text-blue-600 hover:underline font-medium"
+                            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
                           >
                             {sup.phone}
                           </a>
@@ -422,7 +430,7 @@ export default function SupplierSearchPanel() {
                             href={sup.website}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-blue-600 hover:underline font-medium truncate"
+                            className="text-blue-600 dark:text-blue-400 hover:underline font-medium truncate"
                           >
                             Website →
                           </a>
@@ -430,12 +438,12 @@ export default function SupplierSearchPanel() {
                       )}
 
                       {sup.lat && sup.lon && (
-                        <div className="pt-1 mt-1 border-t border-gray-200">
+                        <div className="pt-1 mt-1 border-t border-gray-200 dark:border-gray-700">
                           <a
                             href={`https://www.openstreetmap.org/?mlat=${sup.lat}&mlon=${sup.lon}&zoom=16`}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-blue-600 hover:underline font-medium"
+                            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
                           >
                             🗺️ View Map →
                           </a>

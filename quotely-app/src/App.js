@@ -10,6 +10,7 @@ import ResetPassword from "./pages/ResetPassword.js";
 import ProtectedRoute from "./components/ProtectedRoute.js";
 import Briefings from "./pages/Briefings.js";
 import CreateBriefing from "./pages/CreateBriefing.js";
+import SupplierResponse from "./pages/SupplierResponse.js"; // ← ADD THIS
 
 function App() {
   return (
@@ -44,7 +45,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/briefings/create-briefing"
             element={
@@ -54,9 +54,15 @@ function App() {
             }
           />
 
-          {/* Public Route */}
+          {/* Public Routes */}
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* ✅ ADD THIS - Public Supplier Response Route */}
+          <Route
+            path="/supplier-response/:token"
+            element={<SupplierResponse />}
+          />
         </Routes>
         <Footer />
       </Router>

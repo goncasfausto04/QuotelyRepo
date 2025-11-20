@@ -60,14 +60,8 @@ export default function ResetPassword() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-6"
-      style={{
-        background:
-          "linear-gradient(0deg, rgba(244, 244, 246, 0.3), rgba(244, 244, 246, 0.3)), #F9F8F6",
-      }}
-    >
-      <div className="w-full max-w-md bg-white border border-gray-200 rounded-lg shadow-sm px-8 py-8">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50 dark:bg-gray-900">
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm px-8 py-8">
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <img
@@ -78,30 +72,21 @@ export default function ResetPassword() {
         </div>
 
         {/* Heading */}
-        <h2
-          className="text-xl font-semibold text-center mb-1"
-          style={{ color: "#17171C", letterSpacing: "-0.6px" }}
-        >
+        <h2 className="text-xl font-semibold text-center mb-1 text-gray-900 dark:text-white">
           Set New Password
         </h2>
-        <p className="text-center text-sm mb-6" style={{ color: "#797986" }}>
+        <p className="text-center text-sm mb-6 text-gray-600 dark:text-gray-400">
           Enter your new password below
         </p>
 
         {/* Error/Success Messages */}
         {errorMsg && (
-          <div
-            className="mb-4 p-3 rounded-md text-sm"
-            style={{ background: "#FEE2E2", color: "#991B1B" }}
-          >
+          <div className="mb-4 p-3 rounded-md text-sm bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-200 border border-red-200 dark:border-red-800">
             {errorMsg}
           </div>
         )}
         {successMsg && (
-          <div
-            className="mb-4 p-3 rounded-md text-sm"
-            style={{ background: "#D1FAE5", color: "#065F46" }}
-          >
+          <div className="mb-4 p-3 rounded-md text-sm bg-green-50 dark:bg-green-900/20 text-green-900 dark:text-green-200 border border-green-200 dark:border-green-800">
             {successMsg}
           </div>
         )}
@@ -109,10 +94,7 @@ export default function ResetPassword() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label
-              className="block text-sm font-semibold mb-2"
-              style={{ color: "#17171C" }}
-            >
+            <label className="block text-sm font-semibold mb-2 text-gray-900 dark:text-white">
               New Password
             </label>
             <input
@@ -123,18 +105,14 @@ export default function ResetPassword() {
                 setPassword(e.target.value);
                 setPasswordError("");
               }}
-              className="w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2"
-              style={{ border: "1px solid #E3E3E8", color: "#797986" }}
+              className="w-full rounded-md px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               required
               minLength={6}
             />
           </div>
 
           <div>
-            <label
-              className="block text-sm font-semibold mb-2"
-              style={{ color: "#17171C" }}
-            >
+            <label className="block text-sm font-semibold mb-2 text-gray-900 dark:text-white">
               Confirm New Password
             </label>
             <input
@@ -145,25 +123,25 @@ export default function ResetPassword() {
                 setConfirmPassword(e.target.value);
                 setPasswordError("");
               }}
-              className="w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2"
-              style={{ border: "1px solid #E3E3E8", color: "#797986" }}
+              className="w-full rounded-md px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               required
               minLength={6}
             />
             {passwordError && (
-              <p className="text-red-500 text-sm mt-1">{passwordError}</p>
+              <p className="text-red-500 dark:text-red-400 text-sm mt-1">
+                {passwordError}
+              </p>
             )}
           </div>
 
           <button
             type="submit"
             disabled={isLoading || password !== confirmPassword}
-            className={`w-full text-white py-2 px-4 rounded-md text-sm font-semibold transition-all ${
+            className={`w-full bg-blue-600 dark:bg-blue-500 text-white py-2 px-4 rounded-md text-sm font-semibold transition-all ${
               isLoading || password !== confirmPassword
                 ? "opacity-50 cursor-not-allowed"
-                : "hover:opacity-90"
+                : "hover:bg-blue-700 dark:hover:bg-blue-600"
             }`}
-            style={{ background: "#000099" }}
           >
             {isLoading ? "Updating..." : "Update Password"}
           </button>
@@ -172,8 +150,7 @@ export default function ResetPassword() {
         <div className="text-center mt-6">
           <button
             onClick={() => navigate("/auth")}
-            className="text-sm font-medium hover:underline"
-            style={{ color: "#000099" }}
+            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
           >
             ← Back to Sign In
           </button>
