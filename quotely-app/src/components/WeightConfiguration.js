@@ -1,4 +1,3 @@
-// src/components/WeightConfiguration.js
 import { useState, useCallback } from "react";
 import {
   Info,
@@ -30,8 +29,9 @@ export default function WeightConfiguration({
 
         convertedWeights[key] = {
           enabled: oldConfig.enabled,
-          weight: Math.max(0, Math.min(5, weightValue)), // Ensure between 0-5
-          direction: oldConfig.direction,
+          weight: Math.max(0, Math.min(5, weightValue)), // Clamp between 0-5
+          direction:
+            availableParams.find((p) => p.key === key)?.direction || "lower", // fixed direction
         };
       });
       return convertedWeights;
@@ -42,8 +42,8 @@ export default function WeightConfiguration({
     availableParams.forEach((param) => {
       defaultWeights[param.key] = {
         enabled: true,
-        weight: 1, // Default to 1 (equal importance)
-        direction: param.direction,
+        weight: 1, // Default importance
+        direction: param.direction, // fixed direction
       };
     });
     return defaultWeights;
@@ -56,7 +56,7 @@ export default function WeightConfiguration({
   const enabledWeights = Object.values(weights).filter((w) => w.enabled);
   const hasEnabledWeights = enabledWeights.length > 0;
 
-  // Stable update function for the new 0-5 scale
+  // Update function without direction change
   const updateWeight = useCallback((paramKey, updates) => {
     setWeights((prev) => {
       const newWeights = { ...prev };
@@ -71,9 +71,7 @@ export default function WeightConfiguration({
       if (updates.hasOwnProperty("weight")) {
         let weightValue = updates.weight;
 
-        // Only accept numbers, no empty strings or text
         if (typeof weightValue === "number") {
-          // Clamp between 0 and 5 for the new scale
           const clampedValue = Math.max(0, Math.min(5, weightValue));
           newWeights[paramKey] = {
             ...newWeights[paramKey],
@@ -82,12 +80,7 @@ export default function WeightConfiguration({
         }
       }
 
-      if (updates.hasOwnProperty("direction")) {
-        newWeights[paramKey] = {
-          ...newWeights[paramKey],
-          direction: updates.direction,
-        };
-      }
+      // Removed direction update - direction is fixed and immutable
 
       return newWeights;
     });
@@ -119,7 +112,7 @@ export default function WeightConfiguration({
     setWeights(resetWeights);
   }, [availableParams]);
 
-  // Apply function
+  // Apply weights
   const applyWeights = useCallback(() => {
     if (hasEnabledWeights && onWeightsApplied) {
       onWeightsApplied(weights);
@@ -153,7 +146,7 @@ export default function WeightConfiguration({
         </button>
       </div>
 
-      {/* Tips Panel */}
+      {/* Tips */}
       {showTips && (
         <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
@@ -185,10 +178,10 @@ export default function WeightConfiguration({
                   • <strong>5</strong> = 5× more important than baseline
                 </li>
                 <li>
-                  • Example: Price=5, Warranty=1 means price is 5× more
-                  important than warranty
+                  Example: Price=5, Warranty=1 means price is 5× more important
+                  than warranty
                 </li>
-                <li>• Use the slider to set importance levels</li>
+                <li>Use the slider to set importance levels</li>
               </ul>
             </div>
           </div>
@@ -246,6 +239,7 @@ export default function WeightConfiguration({
           const config = weights[param.key];
           if (!config) return null;
 
+          // Remove direction UI
           const directionInfo =
             config.direction === "higher"
               ? {
@@ -270,7 +264,6 @@ export default function WeightConfiguration({
                   : "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 opacity-60"
               }`}
             >
-              {/* Enable/Disable Toggle */}
               <input
                 type="checkbox"
                 checked={config.enabled}
@@ -280,7 +273,6 @@ export default function WeightConfiguration({
                 className="h-5 w-5 text-blue-600 dark:text-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 border-gray-300 dark:border-gray-600 rounded accent-blue-600 dark:accent-blue-500"
               />
 
-              {/* Parameter Info */}
               <div className="flex-1 min-w-0 w-full">
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                   <label
@@ -294,6 +286,7 @@ export default function WeightConfiguration({
                   </label>
                   <span
                     className={`text-xs px-2 py-1 rounded-full ${directionInfo.bg} ${directionInfo.color}`}
+                    style={{ marginLeft: "auto", flexShrink: 0 }}
                   >
                     {directionInfo.icon} {directionInfo.label}
                   </span>
@@ -308,26 +301,9 @@ export default function WeightConfiguration({
                       {param.description}
                     </span>
                   )}
-
-                  <select
-                    value={config.direction}
-                    onChange={(e) =>
-                      updateWeight(param.key, { direction: e.target.value })
-                    }
-                    className={`w-full sm:w-auto border rounded px-2 sm:px-3 py-1 text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
-                      !config.enabled
-                        ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 border-gray-300 dark:border-gray-700"
-                        : "bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600"
-                    }`}
-                    disabled={!config.enabled}
-                  >
-                    <option value="higher">↑ Higher is better</option>
-                    <option value="lower">↓ Lower is better</option>
-                  </select>
                 </div>
               </div>
 
-              {/* Weight Control - READ-ONLY DISPLAY AND SLIDER ONLY */}
               <div className="w-full lg:w-64">
                 <div className="flex items-center gap-3 sm:gap-4 mb-2">
                   <span
@@ -364,7 +340,7 @@ export default function WeightConfiguration({
                   className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider disabled:opacity-50 disabled:cursor-not-allowed accent-blue-600 dark:accent-blue-500"
                 />
 
-                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1 sm:mt-2">
                   <span>0</span>
                   <span>1</span>
                   <span>2</span>
@@ -373,8 +349,7 @@ export default function WeightConfiguration({
                   <span>5</span>
                 </div>
 
-                {/* Importance Level Labels */}
-                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1 sm:mt-2">
                   <span className="text-center">Ignore</span>
                   <span className="text-center">Standard</span>
                   <span className="text-center">5×</span>
@@ -418,7 +393,7 @@ export default function WeightConfiguration({
         </button>
       </div>
 
-      {/* Simple Summary Display */}
+      {/* Summary display */}
       {hasEnabledWeights && (
         <div className="mt-4 p-3 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg">
           <div className="text-sm text-purple-800 dark:text-purple-200">
