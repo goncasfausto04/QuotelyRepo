@@ -10,7 +10,8 @@ import ResetPassword from "./pages/ResetPassword.js";
 import ProtectedRoute from "./components/ProtectedRoute.js";
 import Briefings from "./pages/Briefings.js";
 import CreateBriefing from "./pages/CreateBriefing.js";
-import SupplierResponse from "./pages/SupplierResponse.js"; // ← ADD THIS
+import SupplierResponse from "./pages/SupplierResponse.js";
+import Dashboard from "./pages/Dashboard.js";
 
 function App() {
   return (
@@ -21,6 +22,14 @@ function App() {
           <Route path="/" element={<LandingPage />} />
 
           {/* Protected Routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/briefingpage"
             element={
