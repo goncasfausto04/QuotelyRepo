@@ -111,13 +111,13 @@ function LocationInput({ onLocationSelect, selectedLocation }) {
 
   return (
     <div className="mb-4">
-      <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
         📍 Location
       </label>
       <div className="flex gap-1.5 mb-1.5">
         <input
           type="text"
-          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+          className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded focus:border-blue-500 dark:focus:border-blue-400 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           placeholder="Enter city..."
@@ -127,28 +127,34 @@ function LocationInput({ onLocationSelect, selectedLocation }) {
           type="button"
           onClick={handleUseMyLocation}
           disabled={loading}
-          className="px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+          className="px-3 py-2 bg-blue-600 dark:bg-blue-700 text-white text-xs rounded hover:bg-blue-700 dark:hover:bg-blue-800 disabled:opacity-50 whitespace-nowrap"
         >
           📍
         </button>
       </div>
-      {loading && <p className="text-xs text-gray-500">Loading...</p>}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {loading && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">Loading...</p>
+      )}
+      {error && (
+        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
       {selectedLocation && (
-        <p className="text-xs text-green-600">✓ Location set</p>
+        <p className="text-xs text-green-600 dark:text-green-400">
+          ✓ Location set
+        </p>
       )}
       {!loading && suggestions.length > 0 && (
-        <ul className="absolute z-50 w-[350px] max-h-48 overflow-y-auto border border-gray-300 rounded bg-white shadow-lg mt-1">
+        <ul className="absolute z-50 w-[350px] max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 shadow-lg mt-1">
           {suggestions.map((place) => (
             <li
               key={place.place_id}
-              className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm border-b last:border-b-0"
+              className="px-3 py-2 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm border-b border-gray-200 dark:border-gray-700 last:border-b-0"
               onClick={() => handleSelect(place)}
             >
-              <div className="font-medium text-gray-800 truncate">
+              <div className="font-medium text-gray-800 dark:text-white truncate">
                 {place.display_name.split(",")[0]}
               </div>
-              <div className="text-xs text-gray-500 truncate">
+              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                 {place.display_name.split(",").slice(1, 3).join(",")}
               </div>
             </li>
@@ -291,8 +297,8 @@ export default function SupplierSearchPanel() {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md border border-gray-200 p-4 h-fit">
-      <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-4 h-fit">
+      <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
         🔍 Find Suppliers
       </h3>
 
@@ -302,7 +308,7 @@ export default function SupplierSearchPanel() {
       />
 
       <div className="mb-4">
-        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
           🏷️ Categories
         </label>
         <div className="flex flex-wrap gap-1.5">
@@ -313,8 +319,8 @@ export default function SupplierSearchPanel() {
               onClick={() => toggleCategory(cat.value)}
               className={`px-2.5 py-1.5 text-xs rounded border transition-all ${
                 selectedCategories.includes(cat.value)
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+                  ? "bg-blue-600 dark:bg-blue-700 text-white border-blue-600 dark:border-blue-700"
+                  : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500"
               }`}
             >
               {cat.label}
@@ -324,7 +330,7 @@ export default function SupplierSearchPanel() {
       </div>
 
       <div className="mb-4">
-        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
           📏 Radius: {(radius / 1000).toFixed(0)} km
         </label>
         <input
@@ -333,7 +339,7 @@ export default function SupplierSearchPanel() {
           max={50}
           value={radius / 1000}
           onChange={(e) => setRadius(e.target.value * 1000)}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+          className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600 dark:accent-blue-500"
         />
         <div className="flex justify-between text-xs text-gray-500 mt-0.5">
           <span>1km</span>
@@ -344,24 +350,28 @@ export default function SupplierSearchPanel() {
       <button
         onClick={searchSuppliers}
         disabled={loading || !location || selectedCategories.length === 0}
-        className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        className="w-full px-4 py-2.5 bg-blue-600 dark:bg-blue-700 text-white text-sm font-semibold rounded hover:bg-blue-700 dark:hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
       >
         {loading ? "🔄 Searching..." : "🔍 Search"}
       </button>
 
       {hasSearched && (
-        <div className="mt-4 border-t border-gray-200 pt-4">
+        <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded p-2 mb-3">
-              <p className="text-xs text-red-700">⚠️ {error}</p>
+            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded p-2 mb-3">
+              <p className="text-xs text-red-700 dark:text-red-200">
+                ⚠️ {error}
+              </p>
             </div>
           )}
 
           {!loading && !error && suppliers.length === 0 && (
             <div className="text-center py-6">
               <div className="text-3xl mb-2">😔</div>
-              <p className="text-xs text-gray-600">No suppliers found</p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-600 dark:text-gray-300">
+                No suppliers found
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Try increasing radius
               </p>
             </div>
@@ -370,7 +380,7 @@ export default function SupplierSearchPanel() {
           {suppliers.length > 0 && (
             <>
               <div className="mb-3">
-                <p className="text-xs font-semibold text-gray-700">
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
                   Found {suppliers.length} supplier
                   {suppliers.length !== 1 ? "s" : ""}
                 </p>
@@ -380,21 +390,21 @@ export default function SupplierSearchPanel() {
                 {suppliers.map((sup) => (
                   <div
                     key={sup.key}
-                    className="border border-gray-200 rounded-lg p-3 hover:border-blue-400 hover:shadow transition-all bg-gray-50"
+                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow transition-all bg-gray-50 dark:bg-gray-900"
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <h4 className="text-sm font-bold text-gray-800 flex-1 leading-tight">
+                      <h4 className="text-sm font-bold text-gray-800 dark:text-white flex-1 leading-tight">
                         {sup.name}
                       </h4>
                       {sup.distance && (
-                        <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-semibold whitespace-nowrap">
+                        <span className="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs font-semibold whitespace-nowrap">
                           {sup.distance}km
                         </span>
                       )}
                     </div>
 
                     <div className="space-y-1 text-xs">
-                      <div className="flex items-start gap-1.5 text-gray-600">
+                      <div className="flex items-start gap-1.5 text-gray-600 dark:text-gray-300">
                         <span>📍</span>
                         <span className="flex-1 leading-tight">
                           {sup.address}
@@ -406,7 +416,7 @@ export default function SupplierSearchPanel() {
                           <span>📞</span>
                           <a
                             href={`tel:${sup.phone}`}
-                            className="text-blue-600 hover:underline font-medium"
+                            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
                           >
                             {sup.phone}
                           </a>
@@ -420,7 +430,7 @@ export default function SupplierSearchPanel() {
                             href={sup.website}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-blue-600 hover:underline font-medium truncate"
+                            className="text-blue-600 dark:text-blue-400 hover:underline font-medium truncate"
                           >
                             Website →
                           </a>
@@ -428,12 +438,12 @@ export default function SupplierSearchPanel() {
                       )}
 
                       {sup.lat && sup.lon && (
-                        <div className="pt-1 mt-1 border-t border-gray-200">
+                        <div className="pt-1 mt-1 border-t border-gray-200 dark:border-gray-700">
                           <a
                             href={`https://www.openstreetmap.org/?mlat=${sup.lat}&mlon=${sup.lon}&zoom=16`}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-blue-600 hover:underline font-medium"
+                            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
                           >
                             🗺️ View Map →
                           </a>

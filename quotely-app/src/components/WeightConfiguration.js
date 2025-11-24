@@ -127,18 +127,18 @@ export default function WeightConfiguration({
   }, [weights, hasEnabledWeights, onWeightsApplied]);
 
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-3">
         <div className="flex items-center gap-3">
-          <div className="bg-purple-100 p-2 rounded-lg">
-            <Scale className="text-purple-600" size={24} />
+          <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-lg">
+            <Scale className="text-purple-600 dark:text-purple-400" size={24} />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-gray-800">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white">
               Configure Comparison Priorities
             </h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
               Set relative importance (0-5) for each factor in your quote
               comparison
             </p>
@@ -146,7 +146,7 @@ export default function WeightConfiguration({
         </div>
         <button
           onClick={() => setShowTips(!showTips)}
-          className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition"
+          className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition"
         >
           <Info size={18} />
           <span className="text-sm">Tips</span>
@@ -155,11 +155,14 @@ export default function WeightConfiguration({
 
       {/* Tips Panel */}
       {showTips && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
-            <Zap className="text-blue-600 mt-0.5 flex-shrink-0" size={18} />
-            <div className="text-sm text-blue-800">
-              <p className="font-semibold mb-2">
+            <Zap
+              className="text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0"
+              size={18}
+            />
+            <div className="text-sm text-blue-800 dark:text-blue-200">
+              <p className="font-semibold mb-2 dark:text-blue-100">
                 How to configure relative importance:
               </p>
               <ul className="space-y-1">
@@ -196,19 +199,22 @@ export default function WeightConfiguration({
       <div
         className={`mb-6 p-4 rounded-lg border-2 ${
           hasEnabledWeights
-            ? "bg-green-50 border-green-200"
-            : "bg-yellow-50 border-yellow-200"
+            ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800"
+            : "bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800"
         }`}
       >
         <div className="flex items-center gap-3">
           {hasEnabledWeights ? (
             <>
-              <CheckCircle className="text-green-600 flex-shrink-0" size={24} />
+              <CheckCircle
+                className="text-green-600 dark:text-green-400 flex-shrink-0"
+                size={24}
+              />
               <div>
-                <h4 className="font-semibold text-green-800">
+                <h4 className="font-semibold text-green-800 dark:text-green-100">
                   Ready to Apply!
                 </h4>
-                <p className="text-green-600 text-sm">
+                <p className="text-green-600 dark:text-green-300 text-sm">
                   Weights configured. The system will calculate best overall
                   value based on your relative priorities.
                 </p>
@@ -217,14 +223,14 @@ export default function WeightConfiguration({
           ) : (
             <>
               <AlertCircle
-                className="text-yellow-600 flex-shrink-0"
+                className="text-yellow-600 dark:text-yellow-400 flex-shrink-0"
                 size={24}
               />
               <div>
-                <h4 className="font-semibold text-yellow-800">
+                <h4 className="font-semibold text-yellow-800 dark:text-yellow-100">
                   Enable Factors
                 </h4>
-                <p className="text-yellow-600 text-sm">
+                <p className="text-yellow-600 dark:text-yellow-300 text-sm">
                   Enable at least one factor to create a personalized
                   comparison.
                 </p>
@@ -258,10 +264,10 @@ export default function WeightConfiguration({
           return (
             <div
               key={param.key}
-              className={`flex items-center gap-4 p-4 border-2 rounded-xl transition-all duration-200 ${
+              className={`flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:gap-4 p-4 border-2 rounded-xl transition-all duration-200 ${
                 config.enabled
-                  ? "bg-white border-blue-200 shadow-sm"
-                  : "bg-gray-50 border-gray-200 opacity-60"
+                  ? "bg-white dark:bg-gray-800 border-blue-200 dark:border-blue-700 shadow-sm"
+                  : "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 opacity-60"
               }`}
             >
               {/* Enable/Disable Toggle */}
@@ -271,15 +277,17 @@ export default function WeightConfiguration({
                 onChange={(e) =>
                   updateWeight(param.key, { enabled: e.target.checked })
                 }
-                className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-5 w-5 text-blue-600 dark:text-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 border-gray-300 dark:border-gray-600 rounded accent-blue-600 dark:accent-blue-500"
               />
 
               {/* Parameter Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
+              <div className="flex-1 min-w-0 w-full">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                   <label
-                    className={`font-semibold text-lg ${
-                      config.enabled ? "text-gray-800" : "text-gray-500"
+                    className={`font-semibold text-base sm:text-lg ${
+                      config.enabled
+                        ? "text-gray-800 dark:text-white"
+                        : "text-gray-500 dark:text-gray-600"
                     }`}
                   >
                     {param.name || param.key.replace(/_/g, " ")}
@@ -291,10 +299,12 @@ export default function WeightConfiguration({
                   </span>
                 </div>
 
-                <div className="flex items-center gap-4 text-sm text-gray-600">
-                  <span>Available in {param.count} quotes</span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-600 dark:text-gray-400">
+                  <span className="text-xs sm:text-sm">
+                    Available in {param.count} quotes
+                  </span>
                   {param.description && (
-                    <span className="text-xs text-gray-500 italic">
+                    <span className="text-xs text-gray-500 dark:text-gray-500 italic hidden sm:inline">
                       {param.description}
                     </span>
                   )}
@@ -304,8 +314,10 @@ export default function WeightConfiguration({
                     onChange={(e) =>
                       updateWeight(param.key, { direction: e.target.value })
                     }
-                    className={`border rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 ${
-                      !config.enabled ? "bg-gray-100 text-gray-400" : "bg-white"
+                    className={`w-full sm:w-auto border rounded px-2 sm:px-3 py-1 text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 ${
+                      !config.enabled
+                        ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 border-gray-300 dark:border-gray-700"
+                        : "bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600"
                     }`}
                     disabled={!config.enabled}
                   >
@@ -316,20 +328,24 @@ export default function WeightConfiguration({
               </div>
 
               {/* Weight Control - READ-ONLY DISPLAY AND SLIDER ONLY */}
-              <div className="w-64">
-                <div className="flex items-center gap-4 mb-2">
+              <div className="w-full lg:w-64">
+                <div className="flex items-center gap-3 sm:gap-4 mb-2">
                   <span
-                    className={`text-sm font-medium ${
-                      config.enabled ? "text-gray-700" : "text-gray-400"
+                    className={`text-xs sm:text-sm font-medium ${
+                      config.enabled
+                        ? "text-gray-700 dark:text-gray-300"
+                        : "text-gray-400 dark:text-gray-600"
                     }`}
                   >
                     Importance:
                   </span>
                   <div className="flex items-center gap-1">
-                    <span className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center bg-gray-50 text-gray-700 font-semibold">
+                    <span className="w-12 sm:w-16 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs sm:text-sm text-center bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-semibold">
                       {config.weight}
                     </span>
-                    <span className="text-sm text-gray-500">/5</span>
+                    <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                      /5
+                    </span>
                   </div>
                 </div>
 
@@ -345,10 +361,10 @@ export default function WeightConfiguration({
                     })
                   }
                   disabled={!config.enabled}
-                  className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider disabled:opacity-50 disabled:cursor-not-allowed accent-blue-600 dark:accent-blue-500"
                 />
 
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                   <span>0</span>
                   <span>1</span>
                   <span>2</span>
@@ -358,7 +374,7 @@ export default function WeightConfiguration({
                 </div>
 
                 {/* Importance Level Labels */}
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                   <span className="text-center">Ignore</span>
                   <span className="text-center">Standard</span>
                   <span className="text-center">5×</span>
@@ -370,18 +386,18 @@ export default function WeightConfiguration({
       </div>
 
       {/* Action Buttons */}
-      <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-between items-center">
-        <div className="flex gap-2">
+      <div className="mt-6 flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <button
             onClick={resetAllWeights}
-            className="px-4 py-2 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition flex items-center gap-2"
+            className="w-full sm:w-auto px-4 py-2 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition flex items-center justify-center gap-2"
           >
             🔄 Reset All
           </button>
 
           <button
             onClick={equalizeWeights}
-            className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition flex items-center gap-2"
+            className="w-full sm:w-auto px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition flex items-center justify-center gap-2"
           >
             <Zap size={16} />
             Set All to 1 (Equal)
@@ -391,10 +407,10 @@ export default function WeightConfiguration({
         <button
           onClick={applyWeights}
           disabled={!hasEnabledWeights}
-          className={`px-6 py-3 font-semibold rounded-lg transition flex items-center gap-2 ${
+          className={`w-full px-6 py-3 font-semibold rounded-lg transition flex items-center justify-center gap-2 ${
             hasEnabledWeights
-              ? "bg-green-600 text-white hover:bg-green-700 shadow-md"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              ? "bg-green-600 dark:bg-green-700 text-white hover:bg-green-700 dark:hover:bg-green-800 shadow-md"
+              : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-600 cursor-not-allowed"
           }`}
         >
           <CheckCircle size={18} />
@@ -404,9 +420,11 @@ export default function WeightConfiguration({
 
       {/* Simple Summary Display */}
       {hasEnabledWeights && (
-        <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-          <div className="text-sm text-purple-800">
-            <p className="font-semibold mb-1">Current Configuration:</p>
+        <div className="mt-4 p-3 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg">
+          <div className="text-sm text-purple-800 dark:text-purple-200">
+            <p className="font-semibold mb-1 dark:text-purple-100">
+              Current Configuration:
+            </p>
             <p>
               Weights represent relative importance multipliers. The system will
               calculate scores based on these ratios.

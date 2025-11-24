@@ -242,23 +242,25 @@ export default function BriefingChat({
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto p-4 sm:p-6 border rounded-lg shadow-lg mt-6 bg-white">
-      <h2 className="text-2xl font-bold mb-2">📧 Quote Request Assistant</h2>
-      <p className="text-gray-600 text-sm mb-4">
+    <div className="w-full max-w-3xl mx-auto p-4 sm:p-6 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg mt-6 bg-white dark:bg-gray-800">
+      <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+        📧 Quote Request Assistant
+      </h2>
+      <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
         Tell me what you need, and I'll help you create a professional quote
         request email
       </p>
 
-      <div className="mb-4 h-64 sm:h-96 overflow-y-auto border rounded p-4 bg-gray-50">
+      <div className="mb-4 h-64 sm:h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded p-4 bg-gray-50 dark:bg-gray-900">
         {messages.map((msg, idx) => (
           <div
             key={idx}
             className={`my-2 p-3 rounded-lg ${
               msg.role === "AI"
-                ? "bg-blue-50 text-blue-900 border-l-4 border-blue-400"
+                ? "bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100 border-l-4 border-blue-400 dark:border-blue-500"
                 : msg.role === "Email"
-                ? "bg-green-50 text-gray-900 border border-green-300 font-mono text-sm whitespace-pre-wrap"
-                : "bg-white text-gray-900 border border-gray-200 sm:ml-8"
+                ? "bg-green-50 dark:bg-green-900/30 text-gray-900 dark:text-gray-100 border border-green-300 dark:border-green-700 font-mono text-sm whitespace-pre-wrap"
+                : "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 sm:ml-8"
             }`}
           >
             <div className="flex justify-between items-start">
@@ -281,14 +283,14 @@ export default function BriefingChat({
         ))}
 
         {isLoading && (
-          <div className="my-2 p-3 rounded-lg bg-blue-50 text-blue-900">
+          <div className="my-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100">
             <strong className="text-xs">AI:</strong>
             <div className="mt-1 flex items-center gap-2">
               <div className="animate-pulse">Thinking...</div>
               <div className="flex gap-1">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-blue-400 dark:bg-blue-300 rounded-full animate-bounce"></div>
                 <div
-                  className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                  className="w-2 h-2 bg-blue-400 dark:bg-blue-300 rounded-full animate-bounce"
                   style={{ animationDelay: "0.1s" }}
                 ></div>
                 <div
@@ -303,7 +305,7 @@ export default function BriefingChat({
 
       <div className="flex flex-col sm:flex-row gap-2">
         <input
-          className="w-full sm:flex-1 border-2 border-gray-300 rounded-lg p-3 focus:border-blue-500 focus:outline-none mb-2 sm:mb-0"
+          className="w-full sm:flex-1 border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-3 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none mb-2 sm:mb-0"
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -335,7 +337,7 @@ export default function BriefingChat({
       {conversationComplete && (
         <button
           onClick={resetConversation}
-          className="mt-4 w-full px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold"
+          className="mt-4 w-full px-6 py-3 bg-gray-600 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 font-semibold"
         >
           🔄 Start New Request
         </button>

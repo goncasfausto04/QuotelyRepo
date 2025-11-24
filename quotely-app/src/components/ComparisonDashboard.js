@@ -332,7 +332,7 @@ export default function ComparisonDashboard({ briefingId }) {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-500"></div>
       </div>
     );
   }
@@ -340,11 +340,18 @@ export default function ComparisonDashboard({ briefingId }) {
   if (error) {
     return (
       <div className="max-w-6xl mx-auto p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="text-red-600 mt-0.5" size={20} />
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle
+            className="text-red-600 dark:text-red-400 mt-0.5"
+            size={20}
+          />
           <div>
-            <h3 className="font-semibold text-red-900">Error Loading Quotes</h3>
-            <p className="text-red-700 text-sm mt-1">{error}</p>
+            <h3 className="font-semibold text-red-900 dark:text-red-100">
+              Error Loading Quotes
+            </h3>
+            <p className="text-red-700 dark:text-red-200 text-sm mt-1">
+              {error}
+            </p>
           </div>
         </div>
       </div>
@@ -354,8 +361,8 @@ export default function ComparisonDashboard({ briefingId }) {
   if (!quotes.length) {
     return (
       <div className="max-w-6xl mx-auto p-6">
-        <div className="bg-white rounded-xl shadow-md p-12 text-center">
-          <div className="text-gray-400 mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center border border-gray-200 dark:border-gray-700">
+          <div className="text-gray-400 dark:text-gray-500 mb-4">
             <svg
               className="mx-auto h-16 w-16"
               fill="none"
@@ -370,17 +377,17 @@ export default function ComparisonDashboard({ briefingId }) {
               />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             No Quotes Yet
           </h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
             {briefingId
               ? "No quotes have been analyzed for this briefing yet."
               : "Start analyzing supplier quotes to see comparisons here."}
           </p>
           <button
             onClick={() => (window.location.href = "/analyze")}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+            className="bg-blue-600 dark:bg-blue-700 text-white px-6 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition"
           >
             Analyze Your First Quote
           </button>
@@ -392,13 +399,13 @@ export default function ComparisonDashboard({ briefingId }) {
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">
       {/* Header */}
-      <div className="bg-white rounded-2xl shadow-lg p-8">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 border border-gray-200 dark:border-gray-700">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-3">
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-3">
               Quotes ({quotes.length}) Comparison
             </h1>
-            <p className="text-xl text-gray-600">
+            <p className="text-xl text-gray-600 dark:text-gray-400">
               {briefingId && quotes[0]?.briefings?.title
                 ? `Comparing quotes for "${quotes[0].briefings.title}"`
                 : "Compare all your supplier quotes"}
@@ -408,14 +415,14 @@ export default function ComparisonDashboard({ briefingId }) {
             {userWeights && (
               <button
                 onClick={resetWeights}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition font-medium"
               >
                 Reset to Default
               </button>
             )}
             <button
               onClick={() => setShowWeightConfig(!showWeightConfig)}
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 transition font-semibold shadow-lg"
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 dark:hover:from-blue-800 dark:hover:to-purple-800 transition font-semibold shadow-lg"
             >
               <Settings size={20} />
               {userWeights ? "Adjust Priorities" : "Configure Priorities"}
@@ -426,74 +433,76 @@ export default function ComparisonDashboard({ briefingId }) {
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Best Price Card */}
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 border border-green-200 shadow-sm">
+          <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 rounded-2xl p-6 border border-green-200 dark:border-green-800 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-green-600 font-semibold mb-2">
+                <p className="text-sm text-green-600 dark:text-green-400 font-semibold mb-2">
                   Best Price
                 </p>
-                <p className="text-3xl font-bold text-gray-900 mb-1">
+                <p className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
                   {bestPrice ? `${bestPrice.currency} ${bestPrice.value}` : "—"}
                 </p>
-                <p className="text-green-700 font-medium">
+                <p className="text-green-700 dark:text-green-300 font-medium">
                   {bestPrice?.supplier || "No supplier"}
                 </p>
               </div>
-              <div className="bg-green-500 rounded-2xl p-4">
+              <div className="bg-green-500 dark:bg-green-600 rounded-2xl p-4">
                 <DollarSign className="text-white" size={32} />
               </div>
             </div>
           </div>
 
           {/* Best Overall Card */}
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6 border border-purple-200 shadow-sm">
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-2xl p-6 border border-purple-200 dark:border-purple-800 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-purple-600 font-semibold mb-2">
+                <p className="text-sm text-purple-600 dark:text-purple-400 font-semibold mb-2">
                   {userWeights ? "🎯 Best Overall" : "Best Value"}
                 </p>
                 {userWeights && bestOverall ? (
                   <>
-                    <p className="text-3xl font-bold text-gray-900 mb-1">
+                    <p className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
                       {bestOverall.score}%
                     </p>
-                    <p className="text-purple-700 font-medium">
+                    <p className="text-purple-700 dark:text-purple-300 font-medium">
                       {bestOverall.supplier}
                     </p>
-                    <p className="text-xs text-purple-600 mt-1">
+                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
                       Based on your priorities
                     </p>
                   </>
                 ) : (
                   <>
-                    <p className="text-3xl font-bold text-gray-900 mb-1">—</p>
-                    <p className="text-purple-600 text-sm">
+                    <p className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+                      —
+                    </p>
+                    <p className="text-purple-600 dark:text-purple-400 text-sm">
                       Configure priorities to find best match
                     </p>
                   </>
                 )}
               </div>
-              <div className="bg-purple-500 rounded-2xl p-4">
+              <div className="bg-purple-500 dark:bg-purple-600 rounded-2xl p-4">
                 <Crown className="text-white" size={32} />
               </div>
             </div>
           </div>
 
           {/* Fastest Delivery Card */}
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 border border-blue-200 shadow-sm">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-2xl p-6 border border-blue-200 dark:border-blue-800 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-blue-600 font-semibold mb-2">
+                <p className="text-sm text-blue-600 dark:text-blue-400 font-semibold mb-2">
                   Fastest Delivery
                 </p>
-                <p className="text-3xl font-bold text-gray-900 mb-1">
+                <p className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
                   {bestLeadTime ? `${bestLeadTime.value} days` : "—"}
                 </p>
-                <p className="text-blue-700 font-medium">
+                <p className="text-blue-700 dark:text-blue-300 font-medium">
                   {bestLeadTime?.supplier || "No supplier"}
                 </p>
               </div>
-              <div className="bg-blue-500 rounded-2xl p-4">
+              <div className="bg-blue-500 dark:bg-blue-600 rounded-2xl p-4">
                 <Zap className="text-white" size={32} />
               </div>
             </div>
@@ -506,8 +515,8 @@ export default function ComparisonDashboard({ briefingId }) {
         {/* Left Column - Price Comparison and Table (40%) */}
         <div className="xl:col-span-2 space-y-8">
           {/* Price Comparison Section */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
               Price Comparison
             </h2>
             <div className="space-y-3">
@@ -524,47 +533,49 @@ export default function ComparisonDashboard({ briefingId }) {
                 return (
                   <div
                     key={quote.id}
-                    className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                    className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                   >
                     <div className="w-32">
                       <div className="flex items-center gap-2">
                         <div
                           className={`w-2 h-2 rounded-full ${
                             isBestOverall
-                              ? "bg-purple-500"
+                              ? "bg-purple-500 dark:bg-purple-400"
                               : isBestPrice
-                              ? "bg-green-500"
-                              : "bg-blue-500"
+                              ? "bg-green-500 dark:bg-green-400"
+                              : "bg-blue-500 dark:bg-blue-400"
                           }`}
                         ></div>
-                        <span className="font-semibold text-gray-900 text-sm">
+                        <span className="font-semibold text-gray-900 dark:text-white text-sm">
                           {quote.supplier_name || "Unknown Supplier"}
                         </span>
                       </div>
                     </div>
 
                     <div className="flex-1">
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
                         <span>
                           {quote.currency || "USD"} {quote.total_price}
                         </span>
                         <span
                           className={
-                            priceDiff <= 0 ? "text-green-600" : "text-red-600"
+                            priceDiff <= 0
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-red-600 dark:text-red-400"
                           }
                         >
                           {priceDiff <= 0 ? "" : "+"}
                           {priceDiff.toFixed(1)}% vs avg
                         </span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                         <div
                           className={`h-2 rounded-full transition-all duration-500 ${
                             isBestOverall
-                              ? "bg-purple-500"
+                              ? "bg-purple-500 dark:bg-purple-400"
                               : isBestPrice
-                              ? "bg-green-500"
-                              : "bg-blue-500"
+                              ? "bg-green-500 dark:bg-green-400"
+                              : "bg-blue-500 dark:bg-blue-400"
                           }`}
                           style={{
                             width: `${Math.min(
@@ -582,9 +593,9 @@ export default function ComparisonDashboard({ briefingId }) {
           </div>
 
           {/* Compact Comparison Table */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 Quick Comparison
               </h2>
             </div>
@@ -592,19 +603,19 @@ export default function ComparisonDashboard({ briefingId }) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 text-xs font-semibold text-gray-500 uppercase">
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <th className="text-left py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
                       Metric
                     </th>
                     {displayQuotes.slice(0, 3).map((quote, index) => (
                       <th key={quote.id} className="text-center py-3 px-2">
                         <div className="flex flex-col items-center">
-                          <span className="font-semibold text-gray-900 text-xs">
+                          <span className="font-semibold text-gray-900 dark:text-white text-xs">
                             {quote.supplier_name?.split(" ")[0] ||
                               `S${index + 1}`}
                           </span>
                           {userWeights && quote.score && (
-                            <span className="text-xs text-purple-600 font-medium mt-1">
+                            <span className="text-xs text-purple-600 dark:text-purple-400 font-medium mt-1">
                               {Math.round(quote.score)}%
                             </span>
                           )}
@@ -613,10 +624,10 @@ export default function ComparisonDashboard({ briefingId }) {
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {/* Price Row */}
-                  <tr className="hover:bg-gray-50 transition">
-                    <td className="py-3 font-medium text-gray-700 text-xs">
+                  <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                    <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
                       Price
                     </td>
                     {displayQuotes.slice(0, 3).map((quote) => (
@@ -624,8 +635,8 @@ export default function ComparisonDashboard({ briefingId }) {
                         <div
                           className={`font-semibold text-xs ${
                             bestPrice && quote.total_price === bestPrice.value
-                              ? "text-green-600"
-                              : "text-gray-900"
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-gray-900 dark:text-white"
                           }`}
                         >
                           {quote.total_price
@@ -637,8 +648,8 @@ export default function ComparisonDashboard({ briefingId }) {
                   </tr>
 
                   {/* Lead Time Row */}
-                  <tr className="hover:bg-gray-50 transition">
-                    <td className="py-3 font-medium text-gray-700 text-xs">
+                  <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                    <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
                       Lead Time
                     </td>
                     {displayQuotes.slice(0, 3).map((quote) => (
@@ -647,8 +658,8 @@ export default function ComparisonDashboard({ briefingId }) {
                           className={`text-xs ${
                             bestLeadTime &&
                             quote.lead_time_days === bestLeadTime.value
-                              ? "text-blue-600 font-semibold"
-                              : "text-gray-700"
+                              ? "text-blue-600 dark:text-blue-400 font-semibold"
+                              : "text-gray-700 dark:text-gray-300"
                           }`}
                         >
                           {quote.lead_time_days
@@ -660,14 +671,14 @@ export default function ComparisonDashboard({ briefingId }) {
                   </tr>
 
                   {/* Warranty Row */}
-                  <tr className="hover:bg-gray-50 transition">
-                    <td className="py-3 font-medium text-gray-700 text-xs">
+                  <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                    <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
                       Warranty
                     </td>
                     {displayQuotes.slice(0, 3).map((quote) => (
                       <td
                         key={quote.id}
-                        className="py-3 px-2 text-center text-gray-700 text-xs"
+                        className="py-3 px-2 text-center text-gray-700 dark:text-gray-300 text-xs"
                       >
                         {quote.warranty_months
                           ? `${quote.warranty_months}m`
@@ -690,21 +701,24 @@ export default function ComparisonDashboard({ briefingId }) {
               initialWeights={userWeights}
             />
           ) : (
-            <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200 h-full flex items-center justify-center">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 border border-gray-200 dark:border-gray-700 h-full flex items-center justify-center">
               <div className="text-center max-w-md">
-                <div className="bg-blue-100 p-4 rounded-full w-16 h-16 mx-auto mb-6 flex items-center justify-center">
-                  <Settings className="text-blue-600" size={32} />
+                <div className="bg-blue-100 dark:bg-blue-900/30 p-4 rounded-full w-16 h-16 mx-auto mb-6 flex items-center justify-center">
+                  <Settings
+                    className="text-blue-600 dark:text-blue-400"
+                    size={32}
+                  />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-800 mb-3">
+                <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-3">
                   Configure Your Priorities
                 </h3>
-                <p className="text-gray-600 mb-6 text-lg">
+                <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">
                   Adjust importance weights to personalize your quote comparison
                   and find the best overall value for your needs.
                 </p>
                 <button
                   onClick={() => setShowWeightConfig(true)}
-                  className="bg-blue-600 text-white py-3 px-8 rounded-xl hover:bg-blue-700 transition font-semibold text-lg shadow-lg"
+                  className="bg-blue-600 dark:bg-blue-700 text-white py-3 px-8 rounded-xl hover:bg-blue-700 dark:hover:bg-blue-800 transition font-semibold text-lg shadow-lg"
                 >
                   Open Priority Settings
                 </button>
@@ -716,14 +730,17 @@ export default function ComparisonDashboard({ briefingId }) {
 
       {/* Personalized Score Explanation */}
       {userWeights && (
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-6 border border-purple-200">
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/30 dark:to-blue-900/30 rounded-2xl p-6 border border-purple-200 dark:border-purple-800">
           <div className="flex items-center gap-4">
-            <Crown className="text-purple-600 flex-shrink-0" size={28} />
+            <Crown
+              className="text-purple-600 dark:text-purple-400 flex-shrink-0"
+              size={28}
+            />
             <div>
-              <h3 className="font-semibold text-purple-800 text-lg mb-2">
+              <h3 className="font-semibold text-purple-800 dark:text-purple-100 text-lg mb-2">
                 Personalized Ranking Active
               </h3>
-              <p className="text-purple-700">
+              <p className="text-purple-700 dark:text-purple-200">
                 Quotes are ranked based on your priority settings. The "Best
                 Overall" quote represents the best overall value according to
                 your configured weights.
