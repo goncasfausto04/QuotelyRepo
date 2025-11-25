@@ -26,7 +26,6 @@ const Dashboard = () => {
     totalQuotes: 0,
     avgQuotesPerBriefing: 0,
     recentBriefings: [],
-    statusDistribution: {},
     quoteTrends: [],
     avgResponseTime: 0,
     bestQuote: null,
@@ -78,18 +77,14 @@ const Dashboard = () => {
 
       // Calculate statistics
       const totalBriefings = briefingsData?.length || 0;
+      // Treat 'activeBriefings' as number of briefings that have at least one quote
       const activeBriefings =
-        briefingsData?.filter((b) => b.status === "active").length || 0;
+        briefingsData?.filter((b) =>
+          quotesData.some((q) => q.briefing_id === b.id)
+        ).length || 0;
       const totalQuotes = quotesData.length;
       const avgQuotesPerBriefing =
         totalBriefings > 0 ? (totalQuotes / totalBriefings).toFixed(1) : 0;
-
-      // Status distribution
-      const statusDistribution = {};
-      briefingsData?.forEach((briefing) => {
-        const status = briefing.status || "draft";
-        statusDistribution[status] = (statusDistribution[status] || 0) + 1;
-      });
 
       // Recent briefings (last 5)
       const recentBriefings = briefingsData?.slice(0, 5) || [];
@@ -142,7 +137,6 @@ const Dashboard = () => {
         ...briefingsData.map((b) => ({
           type: "briefing",
           title: b.title || "Untitled Briefing",
-          status: b.status,
           created_at: b.created_at,
           id: b.id,
         })),
@@ -161,7 +155,8 @@ const Dashboard = () => {
       const categoryDistribution = {};
       briefingsData?.forEach((briefing) => {
         const category = briefing.category || "Uncategorized";
-        categoryDistribution[category] = (categoryDistribution[category] || 0) + 1;
+        categoryDistribution[category] =
+          (categoryDistribution[category] || 0) + 1;
       });
 
       // Average price by category
@@ -169,8 +164,10 @@ const Dashboard = () => {
       const categoryPrices = {};
       briefingsData?.forEach((briefing) => {
         const category = briefing.category || "Uncategorized";
-        const briefingQuotes = quotesData.filter((q) => q.briefing_id === briefing.id);
-        
+        const briefingQuotes = quotesData.filter(
+          (q) => q.briefing_id === briefing.id
+        );
+
         if (briefingQuotes.length > 0) {
           if (!categoryPrices[category]) {
             categoryPrices[category] = { total: 0, count: 0 };
@@ -185,9 +182,11 @@ const Dashboard = () => {
       });
 
       Object.keys(categoryPrices).forEach((category) => {
-        avgPriceByCategory[category] = 
+        avgPriceByCategory[category] =
           categoryPrices[category].count > 0
-            ? (categoryPrices[category].total / categoryPrices[category].count).toFixed(0)
+            ? (
+                categoryPrices[category].total / categoryPrices[category].count
+              ).toFixed(0)
             : 0;
       });
 
@@ -208,7 +207,6 @@ const Dashboard = () => {
         totalQuotes,
         avgQuotesPerBriefing,
         recentBriefings,
-        statusDistribution,
         quoteTrends,
         avgResponseTime,
         bestQuote,
@@ -224,20 +222,7 @@ const Dashboard = () => {
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
-      case "draft":
-        return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300";
-      case "completed":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
-      case "archived":
-        return "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
-      default:
-        return "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
-    }
-  };
+  // Status is no longer used for briefings in the UI
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -390,56 +375,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Charts and Stats */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Status Distribution */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
-                <PieChart className="w-5 h-5 mr-2" />
-                Briefing Status Distribution
-              </h2>
-              <div className="space-y-3">
-                {Object.entries(stats.statusDistribution).map(
-                  ([status, count]) => (
-                    <div key={status} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3 flex-1">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(
-                            status
-                          )}`}
-                        >
-                          {status}
-                        </span>
-                        <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              status === "active"
-                                ? "bg-green-500"
-                                : status === "draft"
-                                ? "bg-yellow-500"
-                                : status === "completed"
-                                ? "bg-blue-500"
-                                : "bg-gray-500"
-                            }`}
-                            style={{
-                              width: `${
-                                (count / stats.totalBriefings) * 100
-                              }%`,
-                            }}
-                          ></div>
-                        </div>
-                      </div>
-                      <span className="text-gray-900 dark:text-white font-semibold ml-3">
-                        {count}
-                      </span>
-                    </div>
-                  )
-                )}
-                {(!stats.statusDistribution || Object.keys(stats.statusDistribution).length === 0) && (
-                  <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
-                    No briefings yet
-                  </p>
-                )}
-              </div>
-            </div>
+            {/* Status UI removed: briefings no longer have state */}
 
             {/* Quote Trends */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
@@ -449,10 +385,16 @@ const Dashboard = () => {
               </h2>
               <div className="flex items-end justify-between h-48 space-x-2">
                 {stats.quoteTrends.map((trend, index) => {
-                  const maxCount = Math.max(...stats.quoteTrends.map((t) => t.count), 1);
+                  const maxCount = Math.max(
+                    ...stats.quoteTrends.map((t) => t.count),
+                    1
+                  );
                   const height = (trend.count / maxCount) * 100;
                   return (
-                    <div key={index} className="flex-1 flex flex-col items-center">
+                    <div
+                      key={index}
+                      className="flex-1 flex flex-col items-center"
+                    >
                       <div className="w-full flex items-end h-40">
                         <div
                           className="w-full bg-blue-500 dark:bg-blue-600 rounded-t transition-all hover:bg-blue-600 dark:hover:bg-blue-500"
@@ -482,33 +424,40 @@ const Dashboard = () => {
                 Most Requested Service Categories
               </h2>
               <div className="flex items-end justify-between h-48 space-x-2">
-                {stats.categoryDistribution && Object.entries(stats.categoryDistribution)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([category, count], index) => {
-                    const maxCount = Math.max(
-                      ...Object.values(stats.categoryDistribution),
-                      1
-                    );
-                    const height = (count / maxCount) * 100;
-                    return (
-                      <div key={category} className="flex-1 flex flex-col items-center">
-                        <div className="w-full flex items-end h-40">
-                          <div
-                            className="w-full bg-gradient-to-t from-purple-500 to-blue-500 dark:from-purple-600 dark:to-blue-600 rounded-t transition-all hover:from-purple-600 hover:to-blue-600 dark:hover:from-purple-500 dark:hover:to-blue-500"
-                            style={{ height: `${height}%` }}
-                            title={`${count} ${count === 1 ? "briefing" : "briefings"}`}
-                          ></div>
+                {stats.categoryDistribution &&
+                  Object.entries(stats.categoryDistribution)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([category, count], index) => {
+                      const maxCount = Math.max(
+                        ...Object.values(stats.categoryDistribution),
+                        1
+                      );
+                      const height = (count / maxCount) * 100;
+                      return (
+                        <div
+                          key={category}
+                          className="flex-1 flex flex-col items-center"
+                        >
+                          <div className="w-full flex items-end h-40">
+                            <div
+                              className="w-full bg-gradient-to-t from-purple-500 to-blue-500 dark:from-purple-600 dark:to-blue-600 rounded-t transition-all hover:from-purple-600 hover:to-blue-600 dark:hover:from-purple-500 dark:hover:to-blue-500"
+                              style={{ height: `${height}%` }}
+                              title={`${count} ${
+                                count === 1 ? "briefing" : "briefings"
+                              }`}
+                            ></div>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 text-center truncate w-full px-1">
+                            {category}
+                          </p>
+                          <p className="text-xs font-semibold text-gray-900 dark:text-white">
+                            {count}
+                          </p>
                         </div>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 text-center truncate w-full px-1">
-                          {category}
-                        </p>
-                        <p className="text-xs font-semibold text-gray-900 dark:text-white">
-                          {count}
-                        </p>
-                      </div>
-                    );
-                  })}
-                {(!stats.categoryDistribution || Object.keys(stats.categoryDistribution).length === 0) && (
+                      );
+                    })}
+                {(!stats.categoryDistribution ||
+                  Object.keys(stats.categoryDistribution).length === 0) && (
                   <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4 w-full">
                     No categories yet
                   </p>
@@ -523,34 +472,39 @@ const Dashboard = () => {
                 Average Quote Price by Category
               </h2>
               <div className="space-y-4">
-                {stats.avgPriceByCategory && Object.entries(stats.avgPriceByCategory)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([category, avgPrice]) => {
-                    const maxPrice = Math.max(
-                      ...Object.values(stats.avgPriceByCategory).map(p => parseFloat(p)),
-                      1
-                    );
-                    const percentage = (parseFloat(avgPrice) / maxPrice) * 100;
-                    return (
-                      <div key={category}>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {category}
-                          </span>
-                          <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                            ${parseFloat(avgPrice).toLocaleString()}
-                          </span>
+                {stats.avgPriceByCategory &&
+                  Object.entries(stats.avgPriceByCategory)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([category, avgPrice]) => {
+                      const maxPrice = Math.max(
+                        ...Object.values(stats.avgPriceByCategory).map((p) =>
+                          parseFloat(p)
+                        ),
+                        1
+                      );
+                      const percentage =
+                        (parseFloat(avgPrice) / maxPrice) * 100;
+                      return (
+                        <div key={category}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              {category}
+                            </span>
+                            <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                              ${parseFloat(avgPrice).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                            <div
+                              className="bg-gradient-to-r from-green-500 to-emerald-600 h-3 rounded-full transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                          <div
-                            className="bg-gradient-to-r from-green-500 to-emerald-600 h-3 rounded-full transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                {(!stats.avgPriceByCategory || Object.keys(stats.avgPriceByCategory).length === 0) && (
+                      );
+                    })}
+                {(!stats.avgPriceByCategory ||
+                  Object.keys(stats.avgPriceByCategory).length === 0) && (
                   <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
                     No pricing data available yet
                   </p>
@@ -565,29 +519,37 @@ const Dashboard = () => {
                 Top Responding Suppliers
               </h2>
               <div className="space-y-3">
-                {stats.topSuppliers && stats.topSuppliers.length > 0 && stats.topSuppliers.map((supplier, index) => (
-                  <div
-                    key={supplier.name}
-                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${
-                        index === 0 ? 'bg-yellow-500' :
-                        index === 1 ? 'bg-gray-400' :
-                        index === 2 ? 'bg-orange-600' :
-                        'bg-blue-500'
-                      }`}>
-                        {index + 1}
+                {stats.topSuppliers &&
+                  stats.topSuppliers.length > 0 &&
+                  stats.topSuppliers.map((supplier, index) => (
+                    <div
+                      key={supplier.name}
+                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${
+                            index === 0
+                              ? "bg-yellow-500"
+                              : index === 1
+                              ? "bg-gray-400"
+                              : index === 2
+                              ? "bg-orange-600"
+                              : "bg-blue-500"
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {supplier.name}
+                        </span>
                       </div>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {supplier.name}
+                      <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                        {supplier.count}{" "}
+                        {supplier.count === 1 ? "quote" : "quotes"}
                       </span>
                     </div>
-                    <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
-                      {supplier.count} {supplier.count === 1 ? "quote" : "quotes"}
-                    </span>
-                  </div>
-                ))}
+                  ))}
                 {(!stats.topSuppliers || stats.topSuppliers.length === 0) && (
                   <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
                     No supplier quotes yet
@@ -619,13 +581,7 @@ const Dashboard = () => {
                         Created {formatDate(briefing.created_at)}
                       </p>
                     </div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(
-                        briefing.status
-                      )}`}
-                    >
-                      {briefing.status || "draft"}
-                    </span>
+                    {/* status removed */}
                   </div>
                 ))}
                 {stats.recentBriefings.length === 0 && (
@@ -678,13 +634,7 @@ const Dashboard = () => {
                           <p className="text-xs text-gray-600 dark:text-gray-400">
                             {activity.title}
                           </p>
-                          <span
-                            className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium capitalize ${getStatusColor(
-                              activity.status
-                            )}`}
-                          >
-                            {activity.status}
-                          </span>
+                          {/* status removed from activity */}
                         </>
                       ) : (
                         <>

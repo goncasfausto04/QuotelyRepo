@@ -2,12 +2,13 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient.js";
 import { useNavigate } from "react-router-dom";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Menu, X } from "lucide-react";
 import { useTheme } from "../context/ThemeContext.js";
 
 export default function Header() {
   const [user, setUser] = useState(null);
   const [photoUrl, setPhotoUrl] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { isDarkMode, toggleTheme } = useTheme();
 
@@ -42,7 +43,7 @@ export default function Header() {
   return (
     <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm transition-colors sticky top-0 z-50 backdrop-blur-sm bg-white/95 dark:bg-gray-900/95">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between relative">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
             <img
@@ -57,6 +58,18 @@ export default function Header() {
 
           {/* Navigation */}
           <div className="flex items-center gap-3 sm:gap-4">
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setMobileMenuOpen((s) => !s)}
+              className="sm:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all active:scale-95"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="w-5 h-5 text-gray-700 dark:text-gray-200" />
+              ) : (
+                <Menu className="w-5 h-5 text-gray-700 dark:text-gray-200" />
+              )}
+            </button>
             {/* Dark Mode Toggle */}
             <button
               onClick={toggleTheme}
@@ -123,6 +136,62 @@ export default function Header() {
               </>
             )}
           </div>
+          {/* Mobile dropdown menu */}
+          {mobileMenuOpen && (
+            <div className="sm:hidden absolute right-4 top-full mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50">
+              {user ? (
+                <>
+                  <Link
+                    to="/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-4 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    to="/briefings"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-4 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Briefings
+                  </Link>
+                  <Link
+                    to="/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-4 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Profile
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/auth"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-4 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    to="/auth"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-4 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Start
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </nav>

@@ -132,20 +132,7 @@ const Briefings = () => {
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "active":
-        return "bg-green-50 text-green-700 border-green-200";
-      case "draft":
-        return "bg-yellow-50 text-yellow-700 border-yellow-200";
-      case "completed":
-        return "bg-blue-50 text-blue-700 border-blue-200";
-      case "archived":
-        return "bg-gray-50 text-gray-700 border-gray-200";
-      default:
-        return "bg-gray-50 text-gray-700 border-gray-200";
-    }
-  };
+  // Briefings no longer track a 'status' field in the UI; state is not handled here.
 
   const handleViewBriefing = (id) => {
     window.location.href = `/briefingpage?briefing=${id}`;
@@ -224,10 +211,10 @@ const Briefings = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                  Active
+                  With Quotes
                 </p>
                 <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                  {briefings.filter((b) => b.status === "active").length}
+                  {briefings.filter((b) => (quoteCounts[b.id] || 0) > 0).length}
                 </p>
               </div>
               <div className="bg-green-100 dark:bg-green-900/30 rounded-full p-3">
@@ -311,9 +298,7 @@ const Briefings = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Title
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
+
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Created
                     </th>
@@ -383,15 +368,7 @@ const Briefings = () => {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border capitalize ${getStatusColor(
-                            briefing.status || "draft"
-                          )}`}
-                        >
-                          {briefing.status || "draft"}
-                        </span>
-                      </td>
+
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
                         {new Date(briefing.created_at).toLocaleDateString(
                           "en-US",

@@ -314,6 +314,13 @@ export default function ComparisonDashboard({ briefingId }) {
     }
   };
 
+  // Track expanded details for mobile cards
+  const [detailsOpen, setDetailsOpen] = useState({});
+
+  const toggleDetails = (id) => {
+    setDetailsOpen((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const inputMethodLabels = {
     email: "📧 Email",
     pdf: "📄 PDF",
@@ -769,25 +776,30 @@ export default function ComparisonDashboard({ briefingId }) {
                           </p>
                         </div>
                       </div>
-                      <div className="mt-3 text-sm text-gray-600 dark:text-gray-300">
-                        <p>
-                          <strong>Warranty:</strong>{" "}
-                          {quote.warranty_months != null
-                            ? `${quote.warranty_months}m`
-                            : "—"}
-                        </p>
-                        <p className="mt-1">
-                          <strong>Shipping:</strong>{" "}
-                          {quote.shipping_cost != null
-                            ? `${quote.currency || "USD"} ${
-                                quote.shipping_cost
-                              }`
-                            : "—"}
-                        </p>
-                        <p className="mt-1">
-                          <strong>Payment:</strong> {quote.payment_terms || "—"}
-                        </p>
-                      </div>
+                      {/* Details collapsed by default on mobile; toggle to view */}
+                      {detailsOpen[quote.id] && (
+                        <div className="mt-3 text-sm text-gray-600 dark:text-gray-300">
+                          <p>
+                            <strong>Warranty:</strong>{" "}
+                            {quote.warranty_months != null
+                              ? `${quote.warranty_months}m`
+                              : "—"}
+                          </p>
+                          <p className="mt-1">
+                            <strong>Shipping:</strong>{" "}
+                            {quote.shipping_cost != null
+                              ? `${quote.currency || "USD"} ${
+                                  quote.shipping_cost
+                                }`
+                              : "—"}
+                          </p>
+                          <p className="mt-1">
+                            <strong>Payment:</strong>{" "}
+                            {quote.payment_terms || "—"}
+                          </p>
+                        </div>
+                      )}
+
                       <div className="mt-3 flex gap-2">
                         <button
                           onClick={() =>
@@ -800,12 +812,10 @@ export default function ComparisonDashboard({ briefingId }) {
                           Copy JSON
                         </button>
                         <button
-                          onClick={() =>
-                            (window.location.href = "/briefingpage")
-                          }
-                          className="flex-1 px-3 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs hover:bg-green-200 dark:hover:bg-green-900/50 transition"
+                          onClick={() => toggleDetails(quote.id)}
+                          className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-800/20 text-gray-800 dark:text-gray-200 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-700/50 transition"
                         >
-                          Compare
+                          {detailsOpen[quote.id] ? "Hide Details" : "Details"}
                         </button>
                       </div>
                     </div>

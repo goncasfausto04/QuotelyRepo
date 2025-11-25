@@ -116,9 +116,6 @@ export default function BriefingPage() {
             </svg>
             Back
           </button>
-          <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-            Active
-          </span>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             {briefing.title || "Untitled Briefing"}
           </h1>

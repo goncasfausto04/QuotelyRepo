@@ -48,7 +48,7 @@ export default function BriefingChat({
       } else {
         const { data, error } = await supabase
           .from("briefings")
-          .insert([{ title: "New Briefing", status: "draft" }])
+          .insert([{ title: "New Briefing" }])
           .select()
           .single();
 

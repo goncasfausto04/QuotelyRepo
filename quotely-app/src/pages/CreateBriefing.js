@@ -31,7 +31,6 @@ export default function CreateBriefing() {
           user_auth_id: user.id,
           title,
           category,
-          status: "draft",
         },
       ])
       .select(); // This returns the inserted record

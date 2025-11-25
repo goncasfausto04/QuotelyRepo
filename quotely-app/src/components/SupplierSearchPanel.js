@@ -110,7 +110,7 @@ function LocationInput({ onLocationSelect, selectedLocation }) {
   };
 
   return (
-    <div className="mb-4">
+    <div className="mb-4 relative">
       <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
         📍 Location
       </label>
@@ -144,7 +144,7 @@ function LocationInput({ onLocationSelect, selectedLocation }) {
         </p>
       )}
       {!loading && suggestions.length > 0 && (
-        <ul className="absolute z-50 w-[350px] max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 shadow-lg mt-1">
+        <ul className="absolute z-50 left-0 right-0 sm:left-auto sm:right-auto sm:w-[350px] max-w-full sm:max-w-[350px] max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 shadow-lg mt-1">
           {suggestions.map((place) => (
             <li
               key={place.place_id}
