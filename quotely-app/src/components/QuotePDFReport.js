@@ -7,7 +7,6 @@ export async function generateQuotesPDF(
   userWeights,
   availableParams = []
 ) {
-  // Input validation
   if (!quotes || !Array.isArray(quotes) || quotes.length === 0) {
     console.error("No quotes provided for PDF generation");
     return;
@@ -21,9 +20,19 @@ export async function generateQuotesPDF(
     const margin = 15;
     const contentWidth = pageWidth - 2 * margin;
 
-    // Helper function to add new page if needed
+    // Color scheme - modern and professional
+    const colors = {
+      primary: [41, 98, 255], // Bright blue
+      secondary: [79, 172, 254], // Light blue
+      accent: [255, 107, 107], // Red for warnings
+      dark: [38, 43, 63], // Dark text
+      light: [145, 158, 171], // Light gray
+      background: [245, 247, 250], // Light background
+    };
+
     const checkPageBreak = (neededSpace = 30) => {
       if (yPosition > pageHeight - neededSpace) {
+        addPageFooter(pdf, pageHeight, margin, contentWidth);
         pdf.addPage();
         yPosition = 15;
         return true;
@@ -31,97 +40,158 @@ export async function generateQuotesPDF(
       return false;
     };
 
+    const addPageFooter = (pdf, pageHeight, margin, contentWidth) => {
+      pdf.setFontSize(8);
+      pdf.setTextColor(...colors.light);
+      pdf.line(margin, pageHeight - 15, margin + contentWidth, pageHeight - 15);
+      pdf.text(
+        `Quotely Report • Generated ${new Date().toLocaleDateString()}`,
+        margin,
+        pageHeight - 10
+      );
+    };
+
     // ===== TITLE PAGE =====
-    pdf.setFontSize(28);
-    pdf.setTextColor(40, 100, 180);
-    pdf.text("Quote Comparison Report", margin, yPosition);
-    yPosition += 15;
+    // Logo/Header area
+    pdf.setFillColor(...colors.primary);
+    pdf.rect(0, 0, pageWidth, 40, "F");
 
-    pdf.setFontSize(14);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text(`Briefing: ${briefingTitle || "All Quotes"}`, margin, yPosition);
-    yPosition += 10;
+    pdf.setFontSize(32);
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont(undefined, "bold");
+    pdf.text("Quote Comparison Report", margin, 25);
+    yPosition = 50;
 
-    pdf.setFontSize(10);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text(
-      `Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
-      margin,
-      yPosition
-    );
-    yPosition += 15;
-
-    // Add summary box
-    pdf.setFillColor(240, 248, 255);
-    pdf.setDrawColor(40, 100, 180);
-    pdf.rect(margin, yPosition, contentWidth, 25, "FD");
-    yPosition += 5;
+    // Briefing details box
+    pdf.setFillColor(...colors.background);
+    pdf.setDrawColor(...colors.secondary);
+    pdf.setLineWidth(0.5);
+    pdf.rect(margin, yPosition, contentWidth, 35, "FD");
 
     pdf.setFontSize(11);
-    pdf.setTextColor(40, 40, 40);
-    pdf.text(`Total Quotes: ${quotes.length}`, margin + 5, yPosition);
-    yPosition += 7;
+    pdf.setTextColor(...colors.dark);
+    pdf.setFont(undefined, "bold");
+    pdf.text("Briefing Details", margin + 5, yPosition + 8);
 
-    if (quotes.some((q) => q.score !== undefined && q.score !== null)) {
-      const bestQuote =
-        quotes.find((q) => q.score !== undefined && q.score !== null) ||
-        quotes[0];
-      pdf.text(
-        `Best Match: ${bestQuote.supplier_name || "Unknown"} (${Math.round(
-          bestQuote.score || 0
-        )}%)`,
-        margin + 5,
-        yPosition
-      );
-      yPosition += 7;
-    }
+    pdf.setFontSize(9);
+    pdf.setFont(undefined, "normal");
+    pdf.text(
+      `Title: ${briefingTitle || "All Quotes"}`,
+      margin + 5,
+      yPosition + 16
+    );
+    pdf.text(
+      `Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
+      margin + 5,
+      yPosition + 23
+    );
+    pdf.text(`Total Quotes: ${quotes.length}`, margin + 5, yPosition + 30);
 
-    yPosition += 8;
+    yPosition += 45;
+
+    // Summary stats boxes
+    const statBoxWidth = (contentWidth - 10) / 3;
+    const stats = [
+      {
+        label: "Total Quotes",
+        value: quotes.length.toString(),
+        color: colors.primary,
+      },
+      {
+        label: "Best Match",
+        value:
+          quotes
+            .find((q) => q.score !== undefined)
+            ?.supplier_name?.substring(0, 15) || "—",
+        color: colors.secondary,
+      },
+      {
+        label: "Avg Score",
+        value: quotes.some((q) => q.score !== undefined)
+          ? `${Math.round(
+              quotes.reduce((sum, q) => sum + (q.score || 0), 0) / quotes.length
+            )}%`
+          : "—",
+        color: colors.accent,
+      },
+    ];
+
+    stats.forEach((stat, idx) => {
+      const xPos = margin + idx * (statBoxWidth + 5);
+      pdf.setFillColor(...stat.color);
+      pdf.rect(xPos, yPosition, statBoxWidth, 20, "F");
+
+      pdf.setFontSize(8);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont(undefined, "normal");
+      pdf.text(stat.label, xPos + 3, yPosition + 7);
+
+      pdf.setFontSize(12);
+      pdf.setFont(undefined, "bold");
+      const valueTruncated = stat.value.substring(0, 12);
+      pdf.text(valueTruncated, xPos + 3, yPosition + 16);
+    });
+
+    yPosition += 30;
 
     // ===== PRIORITIES SECTION =====
     if (userWeights && Object.keys(userWeights).length > 0) {
       checkPageBreak(40);
 
-      pdf.setFontSize(13);
-      pdf.setTextColor(40, 100, 180);
-      pdf.text("Applied Priorities", margin, yPosition);
-      yPosition += 8;
-
-      pdf.setFillColor(230, 245, 255);
-      pdf.setDrawColor(100, 150, 200);
-      pdf.rect(margin, yPosition - 5, contentWidth, 0.5, "FD");
+      // Section header
+      pdf.setFillColor(...colors.primary);
+      pdf.rect(margin, yPosition - 3, contentWidth, 8, "F");
+      pdf.setFontSize(12);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont(undefined, "bold");
+      pdf.text("Applied Scoring Weights", margin + 5, yPosition + 2);
+      yPosition += 12;
 
       pdf.setFontSize(9);
-      pdf.setTextColor(60, 60, 60);
+      pdf.setTextColor(...colors.dark);
+      pdf.setFont(undefined, "normal");
 
       const enabledWeights = Object.entries(userWeights).filter(
         ([_, config]) => config.enabled
       );
 
+      const maxWeight = Math.max(...enabledWeights.map(([_, c]) => c.weight));
+
       enabledWeights.forEach(([key, config]) => {
-        // Get param name from availableParams or format key
         const paramName =
           availableParams.find((p) => p.key === key)?.name ||
           config.name ||
           key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 
-        const maxWeight = Math.max(...enabledWeights.map(([_, c]) => c.weight));
         const importance = Math.round((config.weight / maxWeight) * 100);
-        const barWidth = Math.min((config.weight / maxWeight) * 40, 40);
+        const barWidth = Math.min((config.weight / maxWeight) * 35, 35);
 
-        // Parameter name and weight
-        pdf.text(`${paramName}:`, margin + 5, yPosition);
-        pdf.setTextColor(40, 100, 180);
-        pdf.text(`${config.weight}/5 (${importance}%)`, margin + 50, yPosition);
+        // Parameter name
+        pdf.setTextColor(...colors.dark);
+        pdf.setFont(undefined, "bold");
+        pdf.text(`${paramName}`, margin + 5, yPosition);
 
-        // Weight bar
-        pdf.setDrawColor(200, 200, 200);
-        pdf.rect(margin + 100, yPosition - 2.5, 40, 3);
-        pdf.setFillColor(40, 100, 180);
-        pdf.rect(margin + 100, yPosition - 2.5, barWidth, 3, "F");
+        // Weight value and percentage
+        pdf.setTextColor(...colors.primary);
+        pdf.setFont(undefined, "normal");
+        pdf.text(`${config.weight}/5`, margin + 70, yPosition);
 
-        yPosition += 6;
-        pdf.setTextColor(60, 60, 60);
+        // Weight bar background
+        pdf.setDrawColor(...colors.light);
+        pdf.setLineWidth(0.3);
+        pdf.rect(margin + 95, yPosition - 2, 35, 4);
+
+        // Weight bar fill
+        pdf.setFillColor(...colors.secondary);
+        pdf.rect(margin + 95, yPosition - 2, barWidth, 4, "F");
+
+        // Percentage
+        pdf.setTextColor(...colors.light);
+        pdf.setFontSize(8);
+        pdf.text(`${importance}%`, margin + 132, yPosition);
+
+        yPosition += 7;
+        pdf.setFontSize(9);
       });
 
       yPosition += 8;
@@ -130,36 +200,43 @@ export async function generateQuotesPDF(
     // ===== COMPARISON TABLE =====
     checkPageBreak(50);
 
-    pdf.setFontSize(13);
-    pdf.setTextColor(40, 100, 180);
-    pdf.text("Quick Comparison", margin, yPosition);
-    yPosition += 8;
+    pdf.setFillColor(...colors.primary);
+    pdf.rect(margin, yPosition - 3, contentWidth, 8, "F");
+    pdf.setFontSize(12);
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont(undefined, "bold");
+    pdf.text("Quote Comparison Table", margin + 5, yPosition + 2);
+    yPosition += 10;
 
     // Table header
-    pdf.setFillColor(40, 100, 180);
-    pdf.rect(margin, yPosition - 5, contentWidth, 6, "F");
+    pdf.setFillColor(...colors.dark);
+    pdf.rect(margin, yPosition - 5, contentWidth, 7, "F");
+
     pdf.setTextColor(255, 255, 255);
     pdf.setFontSize(9);
     pdf.setFont(undefined, "bold");
 
     const colWidth = contentWidth / 4;
-    const headers = ["Supplier", "Price", "Lead Time", "Score"];
+    const headers = ["Supplier", "Total Price", "Lead Time", "Score"];
     headers.forEach((header, idx) => {
-      pdf.text(header, margin + idx * colWidth + 3, yPosition);
+      pdf.text(header, margin + 3 + idx * colWidth, yPosition);
     });
 
     pdf.setFont(undefined, "normal");
-    yPosition += 5;
+    yPosition += 7;
 
     // Table rows
-    pdf.setTextColor(60, 60, 60);
-    quotes.slice(0, 10).forEach((quote, idx) => {
+    pdf.setFontSize(8);
+    quotes.slice(0, 15).forEach((quote, idx) => {
       if (idx % 2 === 0) {
-        pdf.setFillColor(245, 248, 252);
+        pdf.setFillColor(...colors.background);
         pdf.rect(margin, yPosition - 5, contentWidth, 6, "F");
       }
 
-      const supplier = (quote.supplier_name || "Unknown").substring(0, 15);
+      const hasGoodScore = quote.score && quote.score > 70;
+      pdf.setTextColor(...(hasGoodScore ? colors.primary : colors.dark));
+
+      const supplier = (quote.supplier_name || "Unknown").substring(0, 18);
       const price = quote.total_price
         ? `${quote.currency || "USD"} ${parseFloat(
             quote.total_price
@@ -174,7 +251,13 @@ export async function generateQuotesPDF(
       pdf.text(supplier, margin + 3, yPosition);
       pdf.text(price, margin + colWidth + 3, yPosition);
       pdf.text(leadTime, margin + colWidth * 2 + 3, yPosition);
+
+      // Highlight high scores
+      if (hasGoodScore) {
+        pdf.setFont(undefined, "bold");
+      }
       pdf.text(score, margin + colWidth * 3 + 3, yPosition);
+      pdf.setFont(undefined, "normal");
 
       yPosition += 6;
     });
@@ -182,53 +265,50 @@ export async function generateQuotesPDF(
     yPosition += 10;
 
     // ===== DETAILED QUOTES =====
-    checkPageBreak(50);
-
-    pdf.setFontSize(13);
-    pdf.setTextColor(40, 100, 180);
-    pdf.text("Detailed Quotes", margin, yPosition);
-    yPosition += 10;
-
     quotes.forEach((quote, index) => {
       checkPageBreak(50);
 
-      // Quote header box
-      pdf.setFillColor(220, 240, 255);
-      pdf.setDrawColor(40, 100, 180);
-      pdf.rect(margin, yPosition - 4, contentWidth, 8, "FD");
+      // Quote header with colored background
+      const scorePercentage = quote.score ? Math.round(quote.score) : null;
+      const headerBg =
+        scorePercentage && scorePercentage > 70
+          ? colors.secondary
+          : scorePercentage && scorePercentage > 50
+          ? colors.primary
+          : colors.light;
+
+      pdf.setFillColor(...headerBg);
+      pdf.rect(margin, yPosition - 4, contentWidth, 10, "F");
 
       pdf.setFontSize(11);
-      pdf.setTextColor(40, 100, 180);
+      pdf.setTextColor(255, 255, 255);
       pdf.setFont(undefined, "bold");
       pdf.text(
-        `${index + 1}. ${quote.supplier_name || "Unknown Supplier"}`,
+        `${index + 1}. ${(quote.supplier_name || "Unknown Supplier").substring(
+          0,
+          30
+        )}`,
         margin + 3,
-        yPosition + 1
+        yPosition + 2
       );
-      pdf.setFont(undefined, "normal");
 
-      if (quote.score !== undefined && quote.score !== null) {
-        pdf.setTextColor(100, 50, 200);
+      if (scorePercentage !== null) {
         pdf.setFontSize(10);
         pdf.text(
-          `Score: ${Math.round(quote.score)}%`,
-          margin + contentWidth - 35,
-          yPosition + 1
+          `${scorePercentage}%`,
+          margin + contentWidth - 15,
+          yPosition + 2
         );
       }
 
-      yPosition += 10;
+      yPosition += 12;
 
-      // Details in two columns
+      // Key details in grid
       pdf.setFontSize(9);
-      pdf.setTextColor(60, 60, 60);
+      pdf.setTextColor(...colors.dark);
+      pdf.setFont(undefined, "bold");
 
-      const leftColX = margin + 5;
-      const rightColX = margin + contentWidth / 2;
-      let leftY = yPosition;
-      let rightY = yPosition;
-
-      const details = [
+      const detailsGrid = [
         [
           "Price",
           quote.total_price
@@ -255,69 +335,77 @@ export async function generateQuotesPDF(
         ],
       ];
 
-      details.forEach(([label, value], idx) => {
-        const isRight = idx >= 2;
-        const x = isRight ? rightColX : leftColX;
-        const y = isRight ? rightY : leftY;
+      const colCount = 2;
+      const detailColWidth = contentWidth / colCount;
 
-        pdf.setTextColor(40, 100, 180);
-        pdf.setFont(undefined, "bold");
-        pdf.text(`${label}:`, x, y);
+      detailsGrid.forEach((detail, idx) => {
+        const row = Math.floor(idx / colCount);
+        const col = idx % colCount;
+        const xPos = margin + 5 + col * detailColWidth;
+        const yPos = yPosition + row * 7;
 
-        pdf.setTextColor(80, 80, 80);
-        pdf.setFont(undefined, "normal");
-        const wrappedValue = pdf.splitTextToSize(value, 50);
-        pdf.text(wrappedValue, x + 25, y);
-
-        if (isRight) {
-          rightY += 6;
-        } else {
-          leftY += 6;
+        // Background for alternating rows
+        if (row % 2 === 0) {
+          pdf.setFillColor(...colors.background);
+          pdf.rect(margin, yPos - 4, contentWidth, 6.5, "F");
         }
+
+        pdf.setTextColor(...colors.primary);
+        pdf.text(`${detail[0]}:`, xPos, yPos);
+
+        pdf.setTextColor(...colors.dark);
+        pdf.setFont(undefined, "normal");
+        pdf.text(detail[1], xPos + 30, yPos);
+        pdf.setFont(undefined, "bold");
       });
 
-      yPosition = Math.max(leftY, rightY) + 5;
+      yPosition += 32;
 
-      // Additional details below
-      pdf.setTextColor(80, 80, 80);
+      // Additional information
       pdf.setFontSize(8);
+      pdf.setTextColor(...colors.dark);
+      pdf.setFont(undefined, "normal");
 
-      const additionalDetails = [
-        ["Warranty Details", quote.warranty_period],
+      const additionalInfo = [
         ["Payment Terms", quote.payment_terms],
         ["Input Method", quote.input_method?.replace(/_/g, " ")],
-        ["Submitted By", quote.submitted_by],
       ];
 
-      additionalDetails.forEach(([label, value]) => {
+      additionalInfo.forEach(([label, value]) => {
         if (value) {
-          const wrappedValue = pdf.splitTextToSize(value, contentWidth - 40);
-          pdf.setTextColor(40, 100, 180);
           pdf.setFont(undefined, "bold");
+          pdf.setTextColor(...colors.primary);
           pdf.text(`${label}:`, margin + 5, yPosition);
-          pdf.setTextColor(80, 80, 80);
           pdf.setFont(undefined, "normal");
-          pdf.text(wrappedValue, margin + 35, yPosition);
-          yPosition += wrappedValue.length * 3 + 2;
+          pdf.setTextColor(...colors.dark);
+          const wrapped = pdf.splitTextToSize(value, contentWidth - 40);
+          pdf.text(wrapped, margin + 35, yPosition);
+          yPosition += wrapped.length * 3 + 2;
         }
       });
 
-      // Materials
+      // Materials section
       if (quote.materials_included && quote.materials_included.length > 0) {
-        yPosition += 2;
-        pdf.setTextColor(40, 100, 180);
+        yPosition += 3;
+        pdf.setFillColor(...colors.background);
+        pdf.rect(margin, yPosition - 4, contentWidth, 0.5, "F");
+        yPosition += 5;
+
         pdf.setFont(undefined, "bold");
+        pdf.setTextColor(...colors.primary);
+        pdf.setFontSize(8);
         pdf.text("Materials Included:", margin + 5, yPosition);
         yPosition += 4;
-        pdf.setTextColor(80, 80, 80);
+
         pdf.setFont(undefined, "normal");
-        quote.materials_included.slice(0, 5).forEach((material) => {
-          pdf.text(`• ${material}`, margin + 10, yPosition);
+        pdf.setTextColor(...colors.dark);
+        quote.materials_included.slice(0, 4).forEach((material) => {
+          pdf.text(`• ${material.substring(0, 40)}`, margin + 10, yPosition);
           yPosition += 3;
         });
-        if (quote.materials_included.length > 5) {
+        if (quote.materials_included.length > 4) {
           pdf.text(
-            `... and ${quote.materials_included.length - 5} more`,
+            `... and ${quote.materials_included.length - 4} more items`,
             margin + 10,
             yPosition
           );
@@ -325,43 +413,16 @@ export async function generateQuotesPDF(
         }
       }
 
-      // Additional fees
-      if (quote.additional_fees && quote.additional_fees.length > 0) {
-        yPosition += 2;
-        pdf.setTextColor(200, 80, 80);
-        pdf.setFont(undefined, "bold");
-        pdf.text("Additional Fees:", margin + 5, yPosition);
-        yPosition += 4;
-        pdf.setTextColor(80, 80, 80);
-        pdf.setFont(undefined, "normal");
-        quote.additional_fees.forEach((fee) => {
-          const feeAmount = fee.amount
-            ? parseFloat(fee.amount).toLocaleString()
-            : "0";
-          const feeText = `• ${fee.name || "Fee"}: ${
-            quote.currency || "USD"
-          } ${feeAmount}`;
-          pdf.text(feeText, margin + 10, yPosition);
-          yPosition += 3;
-        });
-      }
-
-      // Separator
+      // Divider
       yPosition += 5;
-      pdf.setDrawColor(200, 200, 200);
+      pdf.setDrawColor(...colors.light);
+      pdf.setLineWidth(0.3);
       pdf.line(margin, yPosition, margin + contentWidth, yPosition);
-      yPosition += 8;
+      yPosition += 7;
     });
 
-    // Footer on last page
-    checkPageBreak(10);
-    pdf.setFontSize(8);
-    pdf.setTextColor(150, 150, 150);
-    pdf.text(
-      `Generated by Quotely • ${new Date().toLocaleDateString()}`,
-      margin,
-      pageHeight - 10
-    );
+    // Add footer to last page
+    addPageFooter(pdf, pageHeight, margin, contentWidth);
 
     // Save PDF
     const filename = briefingTitle

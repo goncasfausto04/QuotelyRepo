@@ -36,6 +36,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [supplierLink, setSupplierLink] = useState(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
 
   // Fetch existing quotes
   useEffect(() => {
@@ -259,6 +260,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
     }
 
     try {
+      setGeneratingLink(true);
       const res = await fetch(`${API_URL}/api/generate-supplier-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -273,6 +275,8 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
     } catch (error) {
       console.error("Error generating link:", error);
       alert("Failed to generate supplier link");
+    } finally {
+      setGeneratingLink(false);
     }
   };
 
@@ -436,10 +440,24 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                 </p>
                 <button
                   onClick={generateSupplierLink}
-                  className="flex items-center gap-2 px-3 py-1 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-800 transition text-sm"
+                  disabled={generatingLink}
+                  className={`flex items-center gap-2 px-3 py-1 rounded-lg text-sm transition ${
+                    generatingLink
+                      ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                      : "bg-green-600 dark:bg-green-700 text-white hover:bg-green-700 dark:hover:bg-green-800"
+                  }`}
                 >
-                  <LinkIcon size={14} />
-                  Generate Supplier Link
+                  {generatingLink ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <LinkIcon size={14} />
+                      Generate Supplier Link
+                    </>
+                  )}
                 </button>
               </>
             )}
