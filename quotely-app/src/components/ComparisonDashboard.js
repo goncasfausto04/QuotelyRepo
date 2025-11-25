@@ -299,6 +299,20 @@ export default function ComparisonDashboard({ briefingId }) {
   const averagePrice = getAveragePrice();
   const availableParams = getAvailableParameters();
   const displayQuotes = scoredQuotes.length > 0 ? scoredQuotes : quotes;
+  const filteredQuotes = displayQuotes.filter(
+    (q) =>
+      !showOnlyComplete ||
+      (q.warranty_months != null && q.lead_time_days != null)
+  );
+
+  const copyToClipboard = (content) => {
+    try {
+      navigator.clipboard.writeText(content);
+      alert("Copied to clipboard!");
+    } catch (e) {
+      console.warn("Clipboard write failed", e);
+    }
+  };
 
   const inputMethodLabels = {
     email: "📧 Email",
@@ -586,22 +600,16 @@ export default function ComparisonDashboard({ briefingId }) {
 
             {/* Table */}
             <div className="p-6">
-              <div className="overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                <table className="w-full text-sm table-auto border-collapse bg-white dark:bg-gray-800">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-                        Metric
-                      </th>
-                      {displayQuotes
-                        .filter(
-                          (q) =>
-                            !showOnlyComplete ||
-                            (q.warranty_months != null &&
-                              q.lead_time_days != null)
-                        )
-                        .slice(0, 3)
-                        .map((quote, index) => (
+              <div>
+                {/* Table for md+ screens */}
+                <div className="hidden md:block overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  <table className="w-full text-sm table-auto border-collapse bg-white dark:bg-gray-800">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                          Metric
+                        </th>
+                        {filteredQuotes.map((quote, index) => (
                           <th key={quote.id} className="text-center py-3 px-2">
                             <div className="flex flex-col items-center">
                               <span className="font-semibold text-gray-900 dark:text-white text-xs">
@@ -619,23 +627,15 @@ export default function ComparisonDashboard({ briefingId }) {
                             </div>
                           </th>
                         ))}
-                    </tr>
-                  </thead>
+                      </tr>
+                    </thead>
 
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                      <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
-                        Price
-                      </td>
-                      {displayQuotes
-                        .filter(
-                          (q) =>
-                            !showOnlyComplete ||
-                            (q.warranty_months != null &&
-                              q.lead_time_days != null)
-                        )
-                        .slice(0, 3)
-                        .map((quote) => (
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Price
+                        </td>
+                        {filteredQuotes.map((quote) => (
                           <td
                             key={quote.id}
                             className="py-3 px-2 text-center font-semibold text-xs"
@@ -647,21 +647,13 @@ export default function ComparisonDashboard({ briefingId }) {
                               : "—"}
                           </td>
                         ))}
-                    </tr>
+                      </tr>
 
-                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                      <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
-                        Lead Time
-                      </td>
-                      {displayQuotes
-                        .filter(
-                          (q) =>
-                            !showOnlyComplete ||
-                            (q.warranty_months != null &&
-                              q.lead_time_days != null)
-                        )
-                        .slice(0, 3)
-                        .map((quote) => (
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Lead Time
+                        </td>
+                        {filteredQuotes.map((quote) => (
                           <td
                             key={quote.id}
                             className="py-3 px-2 text-center text-xs"
@@ -671,21 +663,13 @@ export default function ComparisonDashboard({ briefingId }) {
                               : "—"}
                           </td>
                         ))}
-                    </tr>
+                      </tr>
 
-                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                      <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
-                        Warranty (Months)
-                      </td>
-                      {displayQuotes
-                        .filter(
-                          (q) =>
-                            !showOnlyComplete ||
-                            (q.warranty_months != null &&
-                              q.lead_time_days != null)
-                        )
-                        .slice(0, 3)
-                        .map((quote) => (
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Warranty (Months)
+                        </td>
+                        {filteredQuotes.map((quote) => (
                           <td
                             key={quote.id}
                             className="py-3 px-2 text-center text-xs"
@@ -695,22 +679,14 @@ export default function ComparisonDashboard({ briefingId }) {
                               : "—"}
                           </td>
                         ))}
-                    </tr>
+                      </tr>
 
-                    {/* Show warranty_period as textual info */}
-                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                      <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
-                        Warranty Details
-                      </td>
-                      {displayQuotes
-                        .filter(
-                          (q) =>
-                            !showOnlyComplete ||
-                            (q.warranty_months != null &&
-                              q.lead_time_days != null)
-                        )
-                        .slice(0, 3)
-                        .map((quote) => (
+                      {/* Show warranty_period as textual info */}
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Warranty Details
+                        </td>
+                        {filteredQuotes.map((quote) => (
                           <td
                             key={quote.id}
                             className="py-3 px-2 text-center text-xs text-gray-600 dark:text-gray-400"
@@ -722,21 +698,13 @@ export default function ComparisonDashboard({ briefingId }) {
                             {quote.warranty_period || "—"}
                           </td>
                         ))}
-                    </tr>
+                      </tr>
 
-                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                      <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
-                        Shipping Cost
-                      </td>
-                      {displayQuotes
-                        .filter(
-                          (q) =>
-                            !showOnlyComplete ||
-                            (q.warranty_months != null &&
-                              q.lead_time_days != null)
-                        )
-                        .slice(0, 3)
-                        .map((quote) => (
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Shipping Cost
+                        </td>
+                        {filteredQuotes.map((quote) => (
                           <td
                             key={quote.id}
                             className="py-3 px-2 text-center text-xs"
@@ -748,22 +716,14 @@ export default function ComparisonDashboard({ briefingId }) {
                               : "—"}
                           </td>
                         ))}
-                    </tr>
+                      </tr>
 
-                    {/* Show payment_terms (textual) */}
-                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                      <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
-                        Payment Terms
-                      </td>
-                      {displayQuotes
-                        .filter(
-                          (q) =>
-                            !showOnlyComplete ||
-                            (q.warranty_months != null &&
-                              q.lead_time_days != null)
-                        )
-                        .slice(0, 3)
-                        .map((quote) => (
+                      {/* Show payment_terms (textual) */}
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Payment Terms
+                        </td>
+                        {filteredQuotes.map((quote) => (
                           <td
                             key={quote.id}
                             className="py-3 px-2 text-center text-xs text-gray-600 dark:text-gray-400"
@@ -773,9 +733,84 @@ export default function ComparisonDashboard({ briefingId }) {
                             {quote.payment_terms || "—"}
                           </td>
                         ))}
-                    </tr>
-                  </tbody>
-                </table>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile: stacked quote cards */}
+                <div className="md:hidden space-y-4">
+                  {filteredQuotes.map((quote) => (
+                    <div
+                      key={quote.id}
+                      className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="font-semibold text-gray-900 dark:text-white">
+                            {quote.supplier_name || "Unknown Supplier"}
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {inputMethodLabels[quote.input_method] || "—"}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-sm text-gray-900 dark:text-white">
+                            {quote.total_price
+                              ? `${quote.currency || "USD"} ${
+                                  quote.total_price
+                                }`
+                              : "—"}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {quote.lead_time_days
+                              ? `${quote.lead_time_days}d`
+                              : "—"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 text-sm text-gray-600 dark:text-gray-300">
+                        <p>
+                          <strong>Warranty:</strong>{" "}
+                          {quote.warranty_months != null
+                            ? `${quote.warranty_months}m`
+                            : "—"}
+                        </p>
+                        <p className="mt-1">
+                          <strong>Shipping:</strong>{" "}
+                          {quote.shipping_cost != null
+                            ? `${quote.currency || "USD"} ${
+                                quote.shipping_cost
+                              }`
+                            : "—"}
+                        </p>
+                        <p className="mt-1">
+                          <strong>Payment:</strong> {quote.payment_terms || "—"}
+                        </p>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() =>
+                            copyToClipboard(
+                              JSON.stringify(quote.analysis_json, null, 2)
+                            )
+                          }
+                          className="flex-1 px-3 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs hover:bg-blue-200 dark:hover:bg-blue-900/50 transition"
+                        >
+                          Copy JSON
+                        </button>
+                        <button
+                          onClick={() =>
+                            (window.location.href = "/briefingpage")
+                          }
+                          className="flex-1 px-3 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs hover:bg-green-200 dark:hover:bg-green-900/50 transition"
+                        >
+                          Compare
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
