@@ -73,6 +73,12 @@ export default function Header() {
             {user ? (
               <>
                 <Link
+                  to="/dashboard"
+                  className="hidden sm:inline-block text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+                >
+                  Dashboard
+                </Link>
+                <Link
                   to="/briefings"
                   className="hidden sm:inline-block text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
                 >
