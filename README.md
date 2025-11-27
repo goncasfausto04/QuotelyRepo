@@ -1,26 +1,35 @@
-Duvidas:
+# Quotely 🎯
 
-Flow geral da app:
-*obrigatorio
+> AI-powered quote comparison platform for smarter procurement decisions
 
-1-Criar email atrvés da LLM
-2-Enviar e-mail manual ou automático
-3-Receber email manual ou atomático
-4*-Gerar Análise na box de input maybe inserir dados manuais também.
+Quotely is a modern web application that helps businesses collect, analyze, and compare supplier quotes intelligently. Using AI-powered analysis and personalized scoring, Quotely transforms the tedious quote comparison process into a data-driven decision-making tool.
 
-Output esperado:
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react)](https://reactjs.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?logo=supabase)](https://supabase.com/)
 
-Uma caixa por empresa para poder comparar preço/tempo/reviews, uma classificação.
+## ✨ Features
 
+### 🤖 AI-Powered Quote Analysis and chatbot
+- **Smart Email Parsing**: Automatically extract pricing, lead times, warranty details, and payment terms from supplier emails
+- **Conversational Briefing Creation**: AI assistant helps you create detailed RFQs (Request for Quote) through natural conversation
+- **Intelligent Data Extraction**: Extract structured data from unstructured supplier responses
 
+### 📊 Advanced Comparison Tools
+- **Customizable Scoring**: Set custom importance weights (0-5 scale) for different criteria (price, speed, warranty, etc.)
+- **Multi-Quote Comparison**: Compare unlimited quotes side-by-side in an intuitive table format
+- **Visual Analytics**: Get instant insights with best price, fastest delivery, and best overall match cards
+- **PDF Report Generation**: Export professional comparison reports with all quote details
 
+### 🎨 Modern User Experience
+- **Dark Mode Support**: Full dark/light theme with system preference detection
+- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
+- **Multi-Language Ready**: i18n infrastructure prepared for English and Portuguese (extensible)
+- **Real-time Updates**: Live data synchronization across your devices
 
-TO-DO:
+### 🔐 Security & Privacy
+- **Secure Authentication**: Supabase Auth with email/password and social logins
+- **Row-Level Security**: Your quotes are private and accessible only to you
+- **Encrypted Storage**: All sensitive data encrypted at rest and in transit
 
-1-Fazer o flow da aplicação FINAL no figma
-2-Passaro Figma para o projeto de forma estática por enquanto.
-3- Começar a dar store das briefings na base de dados, isto é o chat, o email enviado, recebido e o json da analise e associar a uma pessoa, maybe dar um limite por pessoa em 24 horas para nao matar a API.
-4- Começar a testar comparações entre quotes dentro dos briefings.
-
-
-5-Dar tweak aos prompts e talvez limitar o LLM para dar menos problemas.
+## https://quotely-repo.vercel.app
