@@ -19,7 +19,12 @@ export default function BriefingChat({
   const [isConversationStarted, setIsConversationStarted] = useState(false);
   const [conversationComplete, setConversationComplete] = useState(false);
 
-  // Initialize briefing from Supabase or create new one
+  // --- NEW: send email UI state ---
+  const [sendOption, setSendOption] = useState("generated"); // 'generated' | 'custom'
+  const [customEmailText, setCustomEmailText] = useState("");
+  const [recipientsText, setRecipientsText] = useState(""); // comma-separated
+  const [sendLoading, setSendLoading] = useState(false);
+
   // Initialize briefing from Supabase or create new one
   useEffect(() => {
     const initBriefing = async () => {
@@ -79,6 +84,85 @@ export default function BriefingChat({
       saveChatToSupabase(updated);
       return updated;
     });
+  };
+
+  // --- NEW: Helpers for sending email ---
+  const getGeneratedEmail = () => {
+    // find last message with role === 'Email'
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "Email" && messages[i].content) return messages[i].content;
+    }
+    return "";
+  };
+
+  const sendEmailForBriefing = async () => {
+    if (sendLoading) return;
+    const body =
+      sendOption === "generated" ? getGeneratedEmail() : customEmailText || "";
+    if (!body || !body.trim()) {
+      alert("No email body to send. Choose generated or enter custom text.");
+      return;
+    }
+    const recipients = (recipientsText || "")
+      .split(",")
+      .map((r) => r.trim())
+      .filter(Boolean);
+    if (recipients.length === 0) {
+      alert("Enter at least one recipient email (comma-separated).");
+      return;
+    }
+
+    setSendLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          briefingId,
+          subject: `Quote Request from Quotely`,
+          body,
+          recipients,
+          isHtml: false,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "unknown" }));
+        throw new Error(err.error || `Status ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      // append confirmation to chat and optionally the sent email content
+      appendMessage({
+        role: "AI",
+        content: `✅ Email sent to ${recipients.join(", ")}.`,
+      });
+
+      // also append the actual email as a chat Email message if not already present
+      const gen = getGeneratedEmail();
+      const emailContentToShow = sendOption === "generated" ? gen : body;
+      if (emailContentToShow) {
+        appendMessage({
+          role: "Email",
+          content: emailContentToShow,
+          isEmail: true,
+        });
+      }
+
+      // if server returned a threadId, optionally log it (server persists to briefings)
+      if (data?.result?.threadId || data?.threadId) {
+        console.log("Gmail threadId:", data.result?.threadId || data.threadId);
+      }
+    } catch (err) {
+      console.error("Send email error:", err);
+      appendMessage({
+        role: "AI",
+        content: `❌ Failed to send email: ${err.message || String(err)}`,
+      });
+    } finally {
+      setSendLoading(false);
+    }
   };
 
   // Main message sending function
@@ -342,6 +426,91 @@ export default function BriefingChat({
           🔄 Start New Request
         </button>
       )}
+
+      {/* --- NEW: Send email panel (under the chat) --- */}
+      <div className="mt-6 p-4 border border-gray-200 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900">
+        <h3 className="font-semibold mb-2">Send email</h3>
+
+        <div className="flex items-center gap-4 mb-3">
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="sendOption"
+              checked={sendOption === "generated"}
+              onChange={() => setSendOption("generated")}
+            />
+            <span className="text-sm">Use generated email</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="sendOption"
+              checked={sendOption === "custom"}
+              onChange={() => setSendOption("custom")}
+            />
+            <span className="text-sm">Use custom email</span>
+          </label>
+        </div>
+
+        {sendOption === "generated" && (
+          <div className="mb-3">
+            <textarea
+              className="w-full h-40 p-2 border rounded text-sm font-mono"
+              value={getGeneratedEmail()}
+              readOnly
+            />
+          </div>
+        )}
+
+        {sendOption === "custom" && (
+          <div className="mb-3">
+            <textarea
+              className="w-full h-40 p-2 border rounded text-sm font-mono"
+              value={customEmailText}
+              onChange={(e) => setCustomEmailText(e.target.value)}
+              placeholder="Write custom email here..."
+            />
+          </div>
+        )}
+
+        <div className="mb-3">
+          <label className="text-sm block mb-1">Recipients (comma-separated)</label>
+          <input
+            className="w-full p-2 border rounded text-sm"
+            value={recipientsText}
+            onChange={(e) => setRecipientsText(e.target.value)}
+            placeholder="supplier@example.com, sales@vendor.com"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={sendEmailForBriefing}
+            disabled={sendLoading || (sendOption === "generated" && !getGeneratedEmail())}
+            className={`px-4 py-2 rounded font-semibold ${
+              sendLoading
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                : "bg-green-600 text-white hover:bg-green-700"
+            }`}
+          >
+            {sendLoading ? "Sending..." : "Send email"}
+          </button>
+
+          <button
+            onClick={() => {
+              // quick copy current body to clipboard
+              const body = sendOption === "generated" ? getGeneratedEmail() : customEmailText;
+              if (body) {
+                navigator.clipboard.writeText(body);
+                alert("Email copied to clipboard");
+              }
+            }}
+            className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-sm"
+          >
+            Copy body
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

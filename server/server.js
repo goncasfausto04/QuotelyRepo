@@ -9,6 +9,7 @@ import { randomBytes } from "crypto";
 import makeAnalyzeRouter from "./routes/analyze.js";
 import makeConversationRouter from "./routes/conversation.js";
 import makeSupplierRouter from "./routes/supplier.js";
+import makeEmailRouter from "./routes/email.js";
 
 dotenv.config();
 console.log("🔍 FRONTEND_URL:", process.env.FRONTEND_URL);
@@ -167,6 +168,10 @@ app.use("/", conversationRouter);
 // mount supplier routes (generate link, public briefing and submit quote)
 const supplierRouter = makeSupplierRouter({ supabase, randomBytes });
 app.use("/api", supplierRouter);
+
+// mount routes email
+const emailRouter = makeEmailRouter({ supabase });
+app.use("/", emailRouter);
 
 // Start server
 const PORT = process.env.PORT || 3001;

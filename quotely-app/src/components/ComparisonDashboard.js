@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient.js";
+import { supabase } from "../../supabaseClient.js";
 import {
   TrendingUp,
   TrendingDown,
@@ -27,36 +27,155 @@ export default function ComparisonDashboard({ briefingId }) {
   const [scoredQuotes, setScoredQuotes] = useState([]);
   const [showOnlyComplete, setShowOnlyComplete] = useState(false);
 
+  // new: API + processing state for polling supplier replies
+  const API_URL = process.env.REACT_APP_API_URL;
+  const [emailProcessing, setEmailProcessing] = useState(false);
+  const POLL_INTERVAL_MS = 15000;
+
+  // extractable fetch so polling and initial load can reuse it
+  const fetchQuotes = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      let query = supabase
+        .from("quotes")
+        .select("*, briefings(title)")
+        .order("created_at", { ascending: false });
+
+      if (briefingId) query = query.eq("briefing_id", briefingId);
+
+      const { data, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
+      setQuotes(data || []);
+    } catch (err) {
+      console.error("Error fetching quotes:", err);
+      setError(err.message || String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // initial load
   useEffect(() => {
-    const fetchQuotes = async () => {
-      setLoading(true);
-      setError(null);
+    fetchQuotes();
+  }, [briefingId]);
 
+  // Poll briefing emails, analyze new replies and insert as quotes (uses thread messages endpoint)
+  useEffect(() => {
+    if (!briefingId || !API_URL) return;
+    let mounted = true;
+    let timer = null;
+
+    const fetchAndProcess = async () => {
+      if (!mounted || emailProcessing) return;
+      setEmailProcessing(true);
       try {
-        let query = supabase
-          .from("quotes")
-          .select("*, briefings(title)")
-          .order("created_at", { ascending: false });
-
-        if (briefingId) {
-          query = query.eq("briefing_id", briefingId);
+        const res = await fetch(`${API_URL}/api/briefings/${briefingId}/emails`);
+        if (!res.ok) {
+          console.warn("Failed to fetch briefing emails:", res.status);
+          return;
         }
+        const payload = await res.json();
+        const emails = Array.isArray(payload.emails) ? payload.emails : [];
 
-        const { data, error: fetchError } = await query;
+        for (const e of emails) {
+          const content = e.body || e.snippet || "";
+          if (!content.trim()) continue;
 
-        if (fetchError) throw fetchError;
+          // Prefer message id for dedupe; fallback to short fingerprint
+          const messageId = (e.id || e.messageId || e.message_id || null)?.toString() || null;
+          let alreadyExists = false;
 
-        setQuotes(data || []);
+          try {
+            if (messageId) {
+              const { data: already, error: checkErr } = await supabase
+                .from("quotes")
+                .select("id")
+                .eq("briefing_id", briefingId)
+                .eq("message_id", messageId)
+                .limit(1);
+              if (checkErr) console.warn("Supabase check error:", checkErr);
+              if (already && already.length > 0) alreadyExists = true;
+            } else {
+              const fp = content.slice(0, 240).replace(/%/g, "\\%");
+              const { data: already, error: checkErr } = await supabase
+                .from("quotes")
+                .select("id")
+                .eq("briefing_id", briefingId)
+                .ilike("raw_email_text", `%${fp.slice(0, 120)}%`)
+                .limit(1);
+              if (checkErr) console.warn("Supabase check error:", checkErr);
+              if (already && already.length > 0) alreadyExists = true;
+            }
+          } catch (err) {
+            console.warn("Deduplication check failed:", err);
+          }
+          if (alreadyExists) continue;
+
+          // Ask server to analyze the email (reuse your server analyze endpoint)
+          try {
+            const analyzeRes = await fetch(`${API_URL}/api/analyze-email`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ emailText: content, briefingId }),
+            });
+            if (!analyzeRes.ok) {
+              console.warn("Analyze endpoint error:", analyzeRes.status);
+              continue;
+            }
+            const analyzeData = await analyzeRes.json();
+            const analysis =
+              typeof analyzeData.analysis === "string"
+                ? JSON.parse(analyzeData.analysis)
+                : analyzeData.analysis;
+
+            const insertRow = {
+              briefing_id: briefingId,
+              raw_email_text: content,
+              analysis_json: analysis,
+              supplier_name: analysis?.supplier_name || analysis?.vendor || null,
+              contact_email: analysis?.contact_email || null,
+              total_price: analysis?.total_price || null,
+              currency: analysis?.currency || null,
+              lead_time_days: analysis?.lead_time_days || null,
+              input_method: "email_reply",
+              submitted_by: "supplier",
+            };
+            if (messageId) insertRow.message_id = messageId;
+
+            const { data: inserted, error: insertErr } = await supabase
+              .from("quotes")
+              .insert(insertRow)
+              .select()
+              .single();
+
+            if (insertErr) {
+              console.warn("Insert quote failed:", insertErr);
+            } else {
+              // refresh local list so UI shows new quote immediately
+              await fetchQuotes();
+            }
+          } catch (err) {
+            console.warn("Error analyzing/inserting supplier email:", err);
+            continue;
+          }
+        }
       } catch (err) {
-        console.error("Error fetching quotes:", err);
-        setError(err.message);
+        console.warn("Failed fetching briefing emails:", err);
       } finally {
-        setLoading(false);
+        if (mounted) setEmailProcessing(false);
       }
     };
 
-    fetchQuotes();
-  }, [briefingId]);
+    // initial run + poll
+    fetchAndProcess();
+    timer = setInterval(fetchAndProcess, POLL_INTERVAL_MS);
+
+    return () => {
+      mounted = false;
+      if (timer) clearInterval(timer);
+    };
+  }, [briefingId, API_URL, emailProcessing]);
 
   // Get parameters that exist numerically in at least two quotes for scoring
   const getAvailableParameters = () => {
