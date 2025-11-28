@@ -169,9 +169,12 @@ app.use("/", conversationRouter);
 const supplierRouter = makeSupplierRouter({ supabase, randomBytes });
 app.use("/api", supplierRouter);
 
-// mount routes email
-const emailRouter = makeEmailRouter({ supabase });
-app.use("/", emailRouter);
+// mount email routes with a service-role (admin) Supabase client so routes can read/update briefings.gmail_thread_id
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+);
+app.use("/api", makeEmailRouter({ supabase: supabaseAdmin }));
 
 // Start server
 const PORT = process.env.PORT || 3001;
