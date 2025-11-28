@@ -185,6 +185,88 @@ export default function BriefingInbox({ briefingId }) {
     }
   };
 
+  // approve -> analyze -> insert quote -> mark approved
+  const approveAndAnalyze = async (email) => {
+    if (!email || !briefingId) return;
+    setRefreshing(true);
+    try {
+      // mark approved locally/UI first
+      await updateEmailStatus(email.id, "approved");
+
+      // call server analyze endpoint
+      const res = await fetch(`${API_URL}/api/analyze-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailText: email.body, briefingId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.warn("Analyze failed:", data);
+        throw new Error(data.details || data.error || `Status ${res.status}`);
+      }
+
+      // parse analysis (server returns analysis as JSON string or object)
+      let analysis = data.analysis || null;
+      if (typeof analysis === "string") {
+        try {
+          analysis = JSON.parse(analysis);
+        } catch (e) {
+          // fallback: keep raw string
+        }
+      }
+
+      // insert into quotes table
+      const insertRow = {
+        briefing_id: briefingId,
+        raw_email_text: email.body,
+        analysis_json: analysis,
+        supplier_name: analysis?.supplier_name || null,
+        contact_email: analysis?.contact_email || null,
+        total_price: analysis?.total_price || null,
+        currency: analysis?.currency || null,
+        lead_time_days: analysis?.lead_time_days || null,
+        input_method: "email_reply",
+        submitted_by: "supplier",
+        message_id: email.id,
+      };
+
+      const { error: insertErr } = await supabase.from("quotes").insert(insertRow);
+      if (insertErr) {
+        console.warn("Failed to insert quote:", insertErr);
+        throw insertErr;
+      }
+
+      // refresh inbox and quotes UI
+      await fetchEmails();
+    } catch (err) {
+      console.error("Approve+analyze error:", err);
+      alert("Failed to analyze and save quote: " + (err.message || err));
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // delete rejected email status (permanent remove from statuses)
+  const deleteRejected = async (messageId) => {
+    if (!messageId || !briefingId) return;
+    // eslint-disable-next-line no-alert
+    if (!window.confirm("Permanently delete this rejected email from inbox records?")) return;
+    try {
+      const { error: delErr } = await supabase
+        .from("email_statuses")
+        .delete()
+        .match({ briefing_id: briefingId, message_id: messageId });
+
+      if (delErr) throw delErr;
+
+      // remove from UI
+      setEmails((prev) => prev.filter((e) => e.id !== messageId));
+    } catch (err) {
+      console.error("Failed to delete rejected email status:", err);
+      alert("Delete failed: " + (err.message || err));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -308,7 +390,7 @@ export default function BriefingInbox({ briefingId }) {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleApprove(email.id);
+                        approveAndAnalyze(email);
                       }}
                       className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
                         email.status === "approved"
@@ -334,6 +416,18 @@ export default function BriefingInbox({ briefingId }) {
                       <X size={16} />
                       Reject
                     </button>
+
+                    {email.status === "rejected" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteRejected(email.id);
+                        }}
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-300"
+                      >
+                        Delete
+                      </button>
+                    )}
 
                     <button
                       onClick={(e) => {
