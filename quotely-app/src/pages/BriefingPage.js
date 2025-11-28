@@ -4,6 +4,7 @@ import BriefingChat from "../components/BriefingChat.js";
 import SupplierSearchPanel from "../components/SupplierSearchPanel.js";
 import ComparisonDashboard from "../components/ComparisonDashboard.js";
 import QuoteAnalysis from "../components/QuoteAnalysis.js";
+import BriefingInbox from "../components/BriefingInbox.js";
 
 export default function BriefingPage() {
   const briefingId = new URLSearchParams(window.location.search).get(
@@ -85,11 +86,12 @@ export default function BriefingPage() {
     );
   }
 
-  // Tabs configuration remains unchanged
+  // Tabs configuration - add inbox tab
   const tabs = [
     { id: "chat", label: "💬 Chat", description: "Create quote request" },
     { id: "analyze", label: "🔍 Analyze", description: "Extract quote data" },
     { id: "compare", label: "📊 Compare", description: "Compare all quotes" },
+    { id: "inbox", label: "📥 Inbox", description: "Manage email replies" },
   ];
 
   return (
@@ -192,6 +194,21 @@ export default function BriefingPage() {
               </p>
             </div>
             <ComparisonDashboard briefingId={briefing?.id} />
+          </div>
+        )}
+
+        {activeTab === "inbox" && (
+          <div>
+            <div className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-400 dark:border-blue-600 rounded-r-lg p-4 mb-6">
+              <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                Email Inbox:
+              </h3>
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                View all supplier replies, approve or reject quotes, and respond
+                directly to suppliers.
+              </p>
+            </div>
+            <BriefingInbox briefingId={briefing?.id} />
           </div>
         )}
       </div>
