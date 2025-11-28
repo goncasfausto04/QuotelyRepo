@@ -4,23 +4,24 @@ import { sendEmail, getThreadMessages, findThreadIdByBriefingToken } from "../em
 export default function makeEmailRouter({ supabase }) {
   const router = express.Router();
 
-  router.post("/api/send-email", async (req, res) => {
-    const { subject, body, recipients, isHtml } = req.body;
-    const { briefingId } = req.body;
+  // POST /api/send-email (mounted at /api, so route is /send-email)
+  router.post("/send-email", async (req, res) => {
+    const { subject, body, recipients, isHtml, briefingId } = req.body;
     const sender = process.env.GMAIL_API_SENDER || "me";
 
+    // Validate request
     if (!body || !recipients || !Array.isArray(recipients) || recipients.length === 0) {
       return res.status(400).json({ error: "body and recipients[] required" });
     }
 
     try {
-      // If briefingId is provided, append a token to the subject so replies can be grouped
+      // Append briefing token to subject for threading
       let sendSubject = subject || "Quote Request from Quotely";
       if (briefingId) {
         sendSubject = `${sendSubject} [Quotely Briefing #${briefingId}]`;
       }
 
-      // send the email via Gmail helper (returns gmail response.data)
+      // Send via Gmail API
       const result = await sendEmail({
         from: sender,
         to: recipients,
@@ -29,49 +30,33 @@ export default function makeEmailRouter({ supabase }) {
         isHtml: !!isHtml,
       });
 
-      // --- NEW: persist thread id to briefings table if available ---
-      try {
-        const threadId = result?.threadId || result?.data?.threadId || null;
-        if (threadId && supabase && briefingId) {
+      // Persist gmail_thread_id to briefings table
+      const threadId = result?.threadId || null;
+      if (threadId && supabase && briefingId) {
+        try {
           await supabase
             .from("briefings")
             .update({ gmail_thread_id: threadId })
             .eq("id", briefingId);
+          console.log("✅ Persisted gmail_thread_id:", threadId);
+        } catch (dbErr) {
+          console.warn("Failed to persist gmail_thread_id:", dbErr.message || dbErr);
         }
-      } catch (dbErr) {
-        console.warn("Failed to persist gmail_thread_id to briefings:", dbErr.message || dbErr);
-      }
-      // --- end new code ---
-
-      // Persist threadId to Supabase if available and briefingId provided
-      try {
-        const threadId = result?.threadId || result?.id || null;
-        if (briefingId && threadId && supabase) {
-          // Attempt to write gmail_thread_id into the briefings table
-          const { error } = await supabase
-            .from("briefings")
-            .update({ gmail_thread_id: threadId })
-            .eq("id", briefingId);
-          if (error) console.warn("Failed to persist gmail_thread_id:", error.message);
-        }
-      } catch (err) {
-        console.warn("Error persisting threadId to Supabase:", err.message || err);
       }
 
-      res.json({ ok: true, result });
+      res.json({ ok: true, threadId, result });
     } catch (err) {
       console.error("Error sending email:", err);
-      res.status(500).json({ error: "Failed to send email", details: err.message });
+      res.status(500).json({ error: "Failed to send email", details: err.message || String(err) });
     }
   });
 
-  // --- Get emails (thread) for a briefing ---
-  router.get("/api/briefings/:briefingId/emails", async (req, res) => {
+  // GET /api/briefings/:briefingId/emails
+  router.get("/briefings/:briefingId/emails", async (req, res) => {
     const { briefingId } = req.params;
     if (!briefingId) return res.status(400).json({ error: "briefingId required" });
 
     try {
-      // Try to read stored gmail_thread_id from Supabase first (more reliable)
       let threadId = null;
       if (supabase) {
         try {
@@ -86,7 +71,6 @@ export default function makeEmailRouter({ supabase }) {
         }
       }
 
-      // Fallback: search by subject token if no stored threadId
       if (!threadId) {
         const token = `[Quotely Briefing #${briefingId}]`;
         threadId = await findThreadIdByBriefingToken(token);
@@ -95,7 +79,6 @@ export default function makeEmailRouter({ supabase }) {
       if (!threadId) return res.json({ ok: true, emails: [] });
 
       const messages = await getThreadMessages(threadId);
-      // Return messages sorted by date ascending
       messages.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
       res.json({ ok: true, threadId, emails: messages });
     } catch (err) {

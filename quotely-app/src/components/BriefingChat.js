@@ -126,33 +126,22 @@ export default function BriefingChat({
         }),
       });
 
+      // Read response body regardless of status
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "unknown" }));
-        throw new Error(err.error || `Status ${res.status}`);
+        // Show server error details
+        const errMsg = data.details || data.error || `Status ${res.status}`;
+        throw new Error(errMsg);
       }
 
-      const data = await res.json();
-
-      // append confirmation to chat and optionally the sent email content
       appendMessage({
         role: "AI",
         content: `✅ Email sent to ${recipients.join(", ")}.`,
       });
 
-      // also append the actual email as a chat Email message if not already present
-      const gen = getGeneratedEmail();
-      const emailContentToShow = sendOption === "generated" ? gen : body;
-      if (emailContentToShow) {
-        appendMessage({
-          role: "Email",
-          content: emailContentToShow,
-          isEmail: true,
-        });
-      }
-
-      // if server returned a threadId, optionally log it (server persists to briefings)
-      if (data?.result?.threadId || data?.threadId) {
-        console.log("Gmail threadId:", data.result?.threadId || data.threadId);
+      if (data?.threadId) {
+        console.log("Gmail threadId:", data.threadId);
       }
     } catch (err) {
       console.error("Send email error:", err);

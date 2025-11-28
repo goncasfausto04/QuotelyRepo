@@ -1,4 +1,3 @@
-// server/server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -6,10 +5,12 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import { randomBytes } from "crypto";
-import makeAnalyzeRouter from "./routes/analyze.js";
-import makeConversationRouter from "./routes/conversation.js";
-import makeSupplierRouter from "./routes/supplier.js";
+
+// Import route handlers
 import makeEmailRouter from "./routes/email.js";
+import makeConversationRouter from "./routes/conversation.js";
+import makeAnalyzeRouter from "./routes/analyze.js";
+import makeSupplierRouter from "./routes/supplier.js";
 
 dotenv.config();
 console.log("🔍 FRONTEND_URL:", process.env.FRONTEND_URL);
@@ -170,11 +171,12 @@ const supplierRouter = makeSupplierRouter({ supabase, randomBytes });
 app.use("/api", supplierRouter);
 
 // mount email routes with a service-role (admin) Supabase client so routes can read/update briefings.gmail_thread_id
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
-);
-app.use("/api", makeEmailRouter({ supabase: supabaseAdmin }));
+app.use("/api", makeEmailRouter({ supabase }));
+
+// Health check
+app.get("/", (req, res) => {
+  res.json({ status: "ok", message: "Quotely API running" });
+});
 
 // Start server
 const PORT = process.env.PORT || 3001;
