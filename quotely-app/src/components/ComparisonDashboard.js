@@ -183,26 +183,37 @@ export default function ComparisonDashboard({ briefingId }) {
 
     const params = [];
 
+    // Parameter definitions with getters to support derived values from analysis_json
     const allowedParameters = {
       total_price: {
         name: "Total Price",
         direction: "lower",
         description: "Total cost including all charges",
+        getter: (q) => q.total_price,
       },
       lead_time_days: {
         name: "Lead Time",
         direction: "lower",
         description: "Days until completion",
+        getter: (q) => q.lead_time_days,
       },
       warranty_months: {
         name: "Warranty",
         direction: "higher",
         description: "Warranty duration in months",
+        getter: (q) => q.warranty_months,
       },
       shipping_cost: {
         name: "Shipping Cost",
         direction: "lower",
         description: "Additional shipping charges",
+        getter: (q) => q.shipping_cost,
+      },
+      business_rating_value: {
+        name: "Business Rating",
+        direction: "higher",
+        description: "Average customer rating (higher is better)",
+        getter: (q) => q?.analysis_json?.business_rating_value,
       },
     };
 
@@ -210,9 +221,11 @@ export default function ComparisonDashboard({ briefingId }) {
 
     quotes.forEach((quote) => {
       Object.keys(allowedParameters).forEach((paramKey) => {
-        const value = quote[paramKey];
+        const getter = allowedParameters[paramKey].getter;
+        const raw = getter ? getter(quote) : quote[paramKey];
+        const value = raw != null && raw !== "" ? Number(raw) : null;
 
-        if (value != null && value !== "" && !isNaN(value)) {
+        if (value != null && !Number.isNaN(value) && Number.isFinite(value)) {
           paramCounts[paramKey] = (paramCounts[paramKey] || 0) + 1;
         }
       });
@@ -226,6 +239,7 @@ export default function ComparisonDashboard({ briefingId }) {
           name: allowedParameters[paramKey].name,
           direction: allowedParameters[paramKey].direction,
           description: allowedParameters[paramKey].description,
+          getter: allowedParameters[paramKey].getter,
           count: count,
         });
       }
@@ -255,7 +269,7 @@ export default function ComparisonDashboard({ briefingId }) {
 
         enabledParams.forEach((param) => {
           const weightConfig = weights[param.key];
-          const value = quote[param.key];
+          const value = param.getter ? param.getter(quote) : quote[param.key];
 
           if (value == null) return;
 
@@ -445,6 +459,21 @@ export default function ComparisonDashboard({ briefingId }) {
     pdf: "📄 PDF",
     manual_user: "✍️ Manual (User)",
     manual_supplier: "🔗 Supplier Link",
+  };
+
+  const formatBusinessRating = (quote) => {
+    const aj = quote?.analysis_json || {};
+    const value = aj.business_rating_value;
+    const scale = aj.business_rating_scale || 5;
+    const reviews = aj.business_reviews_count;
+    const source = aj.business_rating_source;
+    const url = aj.business_profile_url;
+    if (!value) return null;
+    const parts = [`${value}/${scale}`];
+    if (reviews) parts.push(`${reviews} reviews`);
+    if (source) parts.push(source);
+    const text = parts.join(" • ");
+    return { text, url };
   };
 
   if (loading) {
@@ -759,6 +788,37 @@ export default function ComparisonDashboard({ briefingId }) {
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                       <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                         <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Business Rating
+                        </td>
+                        {filteredQuotes.map((quote) => {
+                          const rating = formatBusinessRating(quote);
+                          return (
+                            <td
+                              key={quote.id}
+                              className="py-3 px-2 text-center text-xs text-gray-700 dark:text-gray-300"
+                            >
+                              {rating ? (
+                                rating.url ? (
+                                  <a
+                                    href={rating.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                                  >
+                                    {rating.text}
+                                  </a>
+                                ) : (
+                                  rating.text
+                                )
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
                           Price
                         </td>
                         {filteredQuotes.map((quote) => (
@@ -898,6 +958,27 @@ export default function ComparisonDashboard({ briefingId }) {
                       {/* Details collapsed by default on mobile; toggle to view */}
                       {detailsOpen[quote.id] && (
                         <div className="mt-3 text-sm text-gray-600 dark:text-gray-300">
+                          {formatBusinessRating(quote) && (
+                            <p className="mb-1">
+                              <strong>Business Rating:</strong>{" "}
+                              {(() => {
+                                const r = formatBusinessRating(quote);
+                                if (!r) return "—";
+                                return r.url ? (
+                                  <a
+                                    href={r.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                                  >
+                                    {r.text}
+                                  </a>
+                                ) : (
+                                  r.text
+                                );
+                              })()}
+                            </p>
+                          )}
                           <p>
                             <strong>Warranty:</strong>{" "}
                             {quote.warranty_months != null

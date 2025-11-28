@@ -38,6 +38,33 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [generatingLink, setGeneratingLink] = useState(false);
 
+  // Only insert known DB columns; keep everything else in analysis_json
+  const ALLOWED_DB_FIELDS = new Set([
+    "supplier_name",
+    "contact_email",
+    "contact_phone",
+    "total_price",
+    "currency",
+    "unit_price",
+    "quantity",
+    "lead_time_days",
+    "delivery_date",
+    "payment_terms",
+    "warranty_period",
+    "warranty_months",
+    "shipping_cost",
+    "notes",
+  ]);
+
+  const pickDbFields = (obj) => {
+    const out = {};
+    if (!obj || typeof obj !== "object") return out;
+    for (const key of ALLOWED_DB_FIELDS) {
+      if (obj[key] !== undefined) out[key] = obj[key];
+    }
+    return out;
+  };
+
   // Fetch existing quotes
   useEffect(() => {
     const fetchExistingQuotes = async () => {
@@ -99,11 +126,12 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
       setFeedback(analysisResult);
 
       // Save to database
+      const dbFields = pickDbFields(analysisResult);
       const { data: insertedQuote, error: insertError } = await supabase
         .from("quotes")
         .insert({
           briefing_id: briefingId,
-          ...analysisResult,
+          ...dbFields,
           raw_email_text: text,
           analysis_json: analysisResult,
           input_method: "email",
@@ -164,11 +192,12 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
       setFeedback(analysisResult);
 
       // Save to database
+      const dbFields = pickDbFields(analysisResult);
       const { data: insertedQuote, error: insertError } = await supabase
         .from("quotes")
         .insert({
           briefing_id: briefingId,
-          ...analysisResult,
+          ...dbFields,
           pdf_file_url: data.pdfUrl,
           analysis_json: analysisResult,
           input_method: "pdf",
@@ -724,6 +753,18 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                       ? `${feedback.currency || "USD"} ${feedback.total_price}`
                       : "—"}
                   </div>
+                  <div className="col-span-2">
+                    <span className="font-medium">Business Rating:</span>{" "}
+                    {feedback.business_rating_value
+                      ? `${feedback.business_rating_value}/${feedback.business_rating_scale || 5}`
+                      : "—"}
+                    {feedback.business_reviews_count
+                      ? ` • ${feedback.business_reviews_count} reviews`
+                      : ""}
+                    {feedback.business_rating_source
+                      ? ` • ${feedback.business_rating_source}`
+                      : ""}
+                  </div>
                 </div>
               </div>
             )}
@@ -844,6 +885,20 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                         ? `${quote.lead_time_days} days`
                         : "—"}
                     </div>
+                    {quote?.analysis_json?.business_rating_value && (
+                      <div className="col-span-2">
+                        <span className="font-medium">Business Rating:</span>{" "}
+                        {quote.analysis_json.business_rating_value}/{
+                          quote.analysis_json.business_rating_scale || 5
+                        }
+                        {quote.analysis_json.business_reviews_count
+                          ? ` • ${quote.analysis_json.business_reviews_count} reviews`
+                          : ""}
+                        {quote.analysis_json.business_rating_source
+                          ? ` • ${quote.analysis_json.business_rating_source}`
+                          : ""}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-2 mt-3">
