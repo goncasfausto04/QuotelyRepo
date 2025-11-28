@@ -26,6 +26,7 @@ export default function ComparisonDashboard({ briefingId }) {
   const [showWeightConfig, setShowWeightConfig] = useState(false);
   const [scoredQuotes, setScoredQuotes] = useState([]);
   const [showOnlyComplete, setShowOnlyComplete] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview"); // overview | calculations
 
   // new: API + processing state for polling supplier replies
   const API_URL = process.env.REACT_APP_API_URL;
@@ -271,11 +272,12 @@ export default function ComparisonDashboard({ briefingId }) {
           const weightConfig = weights[param.key];
           const value = param.getter ? param.getter(quote) : quote[param.key];
 
-          if (value == null) return;
+          if (value == null || value === "" || isNaN(Number(value))) return;
 
           const allValues = quotes
-            .map((q) => q[param.key])
-            .filter((v) => v != null)
+            .map((q) => (param.getter ? param.getter(q) : q[param.key]))
+            .filter((v) => v != null && v !== "" && !isNaN(Number(v)))
+            .map((v) => Number(v))
             .sort((a, b) => a - b);
 
           if (allValues.length === 0) return;
@@ -298,6 +300,9 @@ export default function ComparisonDashboard({ briefingId }) {
             normalizedScore,
             weight: weightConfig.weight,
             rawContribution: normalizedScore * weightConfig.weight,
+            min,
+            max,
+            direction: weightConfig.direction,
           };
         });
 
@@ -329,6 +334,8 @@ export default function ComparisonDashboard({ briefingId }) {
           score: finalScore,
           parameterScores,
           enabledParamCount: enabledParams.length,
+          rawWeightedSum: totalRawScore,
+          totalWeights: totalPossibleScore,
         };
       })
       .sort((a, b) => b.score - a.score);
@@ -729,6 +736,30 @@ export default function ComparisonDashboard({ briefingId }) {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab("overview")}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold border ${
+            activeTab === "overview"
+              ? "bg-blue-600 text-white border-blue-600"
+              : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => setActiveTab("calculations")}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold border ${
+            activeTab === "calculations"
+              ? "bg-blue-600 text-white border-blue-600"
+              : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+          }`}
+        >
+          Calculations
+        </button>
+      </div>
+
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-5 space-y-6">
@@ -786,6 +817,85 @@ export default function ComparisonDashboard({ briefingId }) {
                     </thead>
 
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      {activeTab === "calculations" && userWeights ? (
+                        <>
+                          {Object.keys(
+                            getAvailableParameters().reduce((acc, p) => {
+                              acc[p.key] = p;
+                              return acc;
+                            }, {})
+                          ).map((paramKey) => (
+                            <tr
+                              key={`calc-${paramKey}`}
+                              className="hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                            >
+                              <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                                {getAvailableParameters().find((p) => p.key === paramKey)?.name ||
+                                  paramKey}
+                              </td>
+                              {filteredQuotes.map((quote) => {
+                                const ps = quote.parameterScores?.[paramKey];
+                                return (
+                                  <td
+                                    key={`${quote.id}-${paramKey}`}
+                                    className="py-3 px-2 text-center text-xs text-gray-700 dark:text-gray-300"
+                                    title={
+                                      ps
+                                        ? `val=${ps.originalValue} | norm=${ps.normalizedScore.toFixed(2)} | weight=${ps.weight} | contrib=${ps.rawContribution.toFixed(
+                                            2
+                                          )} | min=${ps.min} max=${ps.max}`
+                                        : "No data"
+                                    }
+                                  >
+                                    {ps ? (
+                                      <div className="flex flex-col items-center gap-0.5">
+                                        <span>
+                                          {Number(ps.originalValue)}
+                                        </span>
+                                        <span className="text-gray-500 dark:text-gray-400">
+                                          n={ps.normalizedScore.toFixed(2)} w={ps.weight}
+                                        </span>
+                                        <span className="text-gray-500 dark:text-gray-400">
+                                          contrib={ps.rawContribution.toFixed(2)}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                          <tr className="bg-gray-50 dark:bg-gray-700/40 border-t border-gray-200 dark:border-gray-600">
+                            <td className="py-3 font-bold text-gray-800 dark:text-gray-200 text-xs">
+                              Final Weighted Sum
+                            </td>
+                            {filteredQuotes.map((quote) => (
+                              <td
+                                key={`sum-${quote.id}`}
+                                className="py-3 px-2 text-center text-xs text-gray-900 dark:text-gray-100 font-semibold"
+                                title={`rawWeightedSum=${quote.rawWeightedSum?.toFixed(3) || 0} totalWeights=${quote.totalWeights || 0}`}
+                              >
+                                {quote.rawWeightedSum != null && quote.totalWeights > 0 ? (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <span>{quote.rawWeightedSum.toFixed(2)}</span>
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                      / {quote.totalWeights.toFixed(2)}
+                                    </span>
+                                    <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                      {Math.round(quote.score)}%
+                                    </span>
+                                  </div>
+                                ) : (
+                                  "—"
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        </>
+                      ) : (
+                        <>
                       <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                         <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
                           Business Rating
@@ -920,6 +1030,8 @@ export default function ComparisonDashboard({ briefingId }) {
                           </td>
                         ))}
                       </tr>
+                        </>
+                      )}
                     </tbody>
                   </table>
                 </div>
