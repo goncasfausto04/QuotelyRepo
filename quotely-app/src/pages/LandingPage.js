@@ -9,6 +9,9 @@ import {
 } from "lucide-react";
 
 export default function LandingPage() {
+  // Optional: set REACT_APP_PROMO_VIDEO_URL in .env or place promo.mp4 in /public
+  const promoUrl = "/landingvideo.mp4";
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
       {/* Hero Section */}
@@ -43,19 +46,30 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Video Placeholder */}
+          {/* Promo video (use REACT_APP_PROMO_VIDEO_URL or /promo.mp4 in public) */}
           <div className="max-w-4xl mx-auto mb-16">
-            <div className="relative aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-300 dark:border-gray-700 shadow-xl overflow-hidden">
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <PlayCircle
-                  className="text-gray-400 dark:text-gray-600 mb-4"
-                  size={64}
+            {promoUrl ? (
+              <div className="relative aspect-video rounded-2xl border-2 border-gray-300 dark:border-gray-700 shadow-xl overflow-hidden">
+                <video
+                  className="w-full h-full object-cover bg-black"
+                  controls
+                  playsInline
+                  src={promoUrl}
                 />
-                <p className="text-gray-500 dark:text-gray-400 font-medium">
-                  Promotional Video Coming Soon
-                </p>
               </div>
-            </div>
+            ) : (
+              <div className="relative aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-300 dark:border-gray-700 shadow-xl overflow-hidden">
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <PlayCircle
+                    className="text-gray-400 dark:text-gray-600 mb-4"
+                    size={64}
+                  />
+                  <p className="text-gray-500 dark:text-gray-400 font-medium">
+                    Promotional Video Coming Soon
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
