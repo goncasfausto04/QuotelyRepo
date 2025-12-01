@@ -34,6 +34,16 @@ export default function WeightConfiguration({
             availableParams.find((p) => p.key === key)?.direction || "lower", // fixed direction
         };
       });
+      // Ensure any new parameters missing from saved weights get sensible defaults
+      availableParams.forEach((param) => {
+        if (!convertedWeights.hasOwnProperty(param.key)) {
+          convertedWeights[param.key] = {
+            enabled: true,
+            weight: 1,
+            direction: param.direction,
+          };
+        }
+      });
       return convertedWeights;
     }
 

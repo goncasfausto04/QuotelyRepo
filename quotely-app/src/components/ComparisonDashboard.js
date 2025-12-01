@@ -11,11 +11,12 @@ import {
   BarChart3,
   Crown,
   Trophy,
+  Zap,
   Settings,
-  Download,
 } from "lucide-react";
 import WeightConfiguration from "./WeightConfiguration.js";
-import { generateQuotesPDF } from "./QuotePDFReport.js";
+import { Download } from "lucide-react"; // Add this to your imports
+import { generateQuotesPDF } from "./QuotePDFReport.js"; // Import the function
 
 export default function ComparisonDashboard({ briefingId }) {
   const [quotes, setQuotes] = useState([]);
@@ -25,9 +26,14 @@ export default function ComparisonDashboard({ briefingId }) {
   const [showWeightConfig, setShowWeightConfig] = useState(false);
   const [scoredQuotes, setScoredQuotes] = useState([]);
   const [showOnlyComplete, setShowOnlyComplete] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState({});
+  const [activeTab, setActiveTab] = useState("overview"); // overview | calculations
 
-  // Fetch quotes from database
+  // new: API + processing state for polling supplier replies
+  const API_URL = process.env.REACT_APP_API_URL;
+  const [emailProcessing, setEmailProcessing] = useState(false);
+  const POLL_INTERVAL_MS = 15000;
+
+  // extractable fetch so polling and initial load can reuse it
   const fetchQuotes = async () => {
     setLoading(true);
     setError(null);
@@ -50,68 +56,289 @@ export default function ComparisonDashboard({ briefingId }) {
     }
   };
 
+  // initial load
   useEffect(() => {
     fetchQuotes();
   }, [briefingId]);
 
-  const allowedParameters = {
-    total_price: { name: "Total Price", direction: "lower" },
-    lead_time_days: { name: "Lead Time", direction: "lower" },
-    warranty_months: { name: "Warranty", direction: "higher" },
-    shipping_cost: { name: "Shipping Cost", direction: "lower" },
-  };
+  // Poll briefing emails, analyze new replies and insert as quotes (uses thread messages endpoint)
+  useEffect(() => {
+    if (!briefingId || !API_URL) return;
+    let mounted = true;
+    let timer = null;
 
+    const fetchAndProcess = async () => {
+      if (!mounted || emailProcessing) return;
+      setEmailProcessing(true);
+      try {
+        const res = await fetch(`${API_URL}/api/briefings/${briefingId}/emails`);
+        if (!res.ok) {
+          console.warn("Failed to fetch briefing emails:", res.status);
+          return;
+        }
+        const payload = await res.json();
+        const emails = Array.isArray(payload.emails) ? payload.emails : [];
+
+        for (const e of emails) {
+          const content = e.body || e.snippet || "";
+          if (!content.trim()) continue;
+
+          // Prefer message id for dedupe; fallback to short fingerprint
+          const messageId = (e.id || e.messageId || e.message_id || null)?.toString() || null;
+          let alreadyExists = false;
+
+          try {
+            if (messageId) {
+              const { data: already, error: checkErr } = await supabase
+                .from("quotes")
+                .select("id")
+                .eq("briefing_id", briefingId)
+                .eq("message_id", messageId)
+                .limit(1);
+              if (checkErr) console.warn("Supabase check error:", checkErr);
+              if (already && already.length > 0) alreadyExists = true;
+            } else {
+              const fp = content.slice(0, 240).replace(/%/g, "\\%");
+              const { data: already, error: checkErr } = await supabase
+                .from("quotes")
+                .select("id")
+                .eq("briefing_id", briefingId)
+                .ilike("raw_email_text", `%${fp.slice(0, 120)}%`)
+                .limit(1);
+              if (checkErr) console.warn("Supabase check error:", checkErr);
+              if (already && already.length > 0) alreadyExists = true;
+            }
+          } catch (err) {
+            console.warn("Deduplication check failed:", err);
+          }
+          if (alreadyExists) continue;
+
+          // Ask server to analyze the email (reuse your server analyze endpoint)
+          try {
+            const analyzeRes = await fetch(`${API_URL}/api/analyze-email`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ emailText: content, briefingId }),
+            });
+            if (!analyzeRes.ok) {
+              console.warn("Analyze endpoint error:", analyzeRes.status);
+              continue;
+            }
+            const analyzeData = await analyzeRes.json();
+            const analysis =
+              typeof analyzeData.analysis === "string"
+                ? JSON.parse(analyzeData.analysis)
+                : analyzeData.analysis;
+
+            const insertRow = {
+              briefing_id: briefingId,
+              raw_email_text: content,
+              analysis_json: analysis,
+              supplier_name: analysis?.supplier_name || analysis?.vendor || null,
+              contact_email: analysis?.contact_email || null,
+              total_price: analysis?.total_price || null,
+              currency: analysis?.currency || null,
+              lead_time_days: analysis?.lead_time_days || null,
+              input_method: "email_reply",
+              submitted_by: "supplier",
+            };
+            if (messageId) insertRow.message_id = messageId;
+
+            const { data: inserted, error: insertErr } = await supabase
+              .from("quotes")
+              .insert(insertRow)
+              .select()
+              .single();
+
+            if (insertErr) {
+              console.warn("Insert quote failed:", insertErr);
+            } else {
+              // refresh local list so UI shows new quote immediately
+              await fetchQuotes();
+            }
+          } catch (err) {
+            console.warn("Error analyzing/inserting supplier email:", err);
+            continue;
+          }
+        }
+      } catch (err) {
+        console.warn("Failed fetching briefing emails:", err);
+      } finally {
+        if (mounted) setEmailProcessing(false);
+      }
+    };
+
+    // initial run + poll
+    fetchAndProcess();
+    timer = setInterval(fetchAndProcess, POLL_INTERVAL_MS);
+
+    return () => {
+      mounted = false;
+      if (timer) clearInterval(timer);
+    };
+  }, [briefingId, API_URL, emailProcessing]);
+
+  // Get parameters that exist numerically in at least two quotes for scoring
   const getAvailableParameters = () => {
     if (!quotes.length) return [];
+
+    const params = [];
+
+    // Parameter definitions with getters to support derived values from analysis_json
+    const allowedParameters = {
+      total_price: {
+        name: "Total Price",
+        direction: "lower",
+        description: "Total cost including all charges",
+        getter: (q) => q.total_price,
+      },
+      lead_time_days: {
+        name: "Lead Time",
+        direction: "lower",
+        description: "Days until completion",
+        getter: (q) => q.lead_time_days,
+      },
+      warranty_months: {
+        name: "Warranty",
+        direction: "higher",
+        description: "Warranty duration in months",
+        getter: (q) => q.warranty_months,
+      },
+      shipping_cost: {
+        name: "Shipping Cost",
+        direction: "lower",
+        description: "Additional shipping charges",
+        getter: (q) => q.shipping_cost,
+      },
+      business_rating_value: {
+        name: "Business Rating",
+        direction: "higher",
+        description: "Average customer rating (higher is better)",
+        getter: (q) => q?.analysis_json?.business_rating_value,
+      },
+    };
+
     const paramCounts = {};
-    quotes.forEach((q) =>
-      Object.keys(allowedParameters).forEach((k) => {
-        const v = q[k];
-        if (v != null && v !== "" && !isNaN(v)) paramCounts[k] = (paramCounts[k] || 0) + 1;
-      })
-    );
-    return Object.keys(allowedParameters)
-      .filter((k) => (paramCounts[k] || 0) >= 2)
-      .map((k) => ({ key: k, ...allowedParameters[k], count: paramCounts[k] || 0 }));
+
+    quotes.forEach((quote) => {
+      Object.keys(allowedParameters).forEach((paramKey) => {
+        const getter = allowedParameters[paramKey].getter;
+        const raw = getter ? getter(quote) : quote[paramKey];
+        const value = raw != null && raw !== "" ? Number(raw) : null;
+
+        if (value != null && !Number.isNaN(value) && Number.isFinite(value)) {
+          paramCounts[paramKey] = (paramCounts[paramKey] || 0) + 1;
+        }
+      });
+    });
+
+    Object.keys(allowedParameters).forEach((paramKey) => {
+      const count = paramCounts[paramKey] || 0;
+      if (count >= 2) {
+        params.push({
+          key: paramKey,
+          name: allowedParameters[paramKey].name,
+          direction: allowedParameters[paramKey].direction,
+          description: allowedParameters[paramKey].description,
+          getter: allowedParameters[paramKey].getter,
+          count: count,
+        });
+      }
+    });
+
+    return params.sort((a, b) => b.count - a.count);
   };
 
   const calculateScores = (weights) => {
     if (!weights || Object.keys(weights).length === 0) return quotes;
-    const params = getAvailableParameters();
-    const scored = quotes
+
+    const availableParams = getAvailableParameters();
+
+    return quotes
       .map((quote) => {
         const parameterScores = {};
-        const enabled = params.filter((p) => weights[p.key]?.enabled && weights[p.key].weight > 0);
-        if (enabled.length === 0) return { ...quote, score: 0, parameterScores: {} };
 
-        enabled.forEach((p) => {
-          const cfg = weights[p.key];
-          const value = quote[p.key];
-          if (value == null || isNaN(value)) return;
-          const allValues = quotes.map((q) => q[p.key]).filter((v) => v != null && !isNaN(v)).sort((a,b)=>a-b);
-          if (!allValues.length) return;
-          const min = allValues[0], max = allValues[allValues.length - 1];
-          let normalized = 1;
-          if (min !== max) {
-            if (cfg.direction === "higher") normalized = (value - min) / (max - min);
-            else normalized = (max - value) / (max - min);
+        const enabledParams = availableParams.filter((param) => {
+          const weightConfig = weights[param.key];
+          return (
+            weightConfig && weightConfig.enabled && weightConfig.weight > 0
+          );
+        });
+
+        if (enabledParams.length === 0)
+          return { ...quote, score: 0, parameterScores: {} };
+
+        enabledParams.forEach((param) => {
+          const weightConfig = weights[param.key];
+          const value = param.getter ? param.getter(quote) : quote[param.key];
+
+          if (value == null || value === "" || isNaN(Number(value))) return;
+
+          const allValues = quotes
+            .map((q) => (param.getter ? param.getter(q) : q[param.key]))
+            .filter((v) => v != null && v !== "" && !isNaN(Number(v)))
+            .map((v) => Number(v))
+            .sort((a, b) => a - b);
+
+          if (allValues.length === 0) return;
+
+          const min = allValues[0];
+          const max = allValues[allValues.length - 1];
+
+          let normalizedScore = 0;
+
+          if (min === max) {
+            normalizedScore = 1;
+          } else if (weightConfig.direction === "higher") {
+            normalizedScore = (value - min) / (max - min);
+          } else {
+            normalizedScore = (max - value) / (max - min);
           }
-          parameterScores[p.key] = {
+
+          parameterScores[param.key] = {
             originalValue: value,
-            normalizedScore: normalized,
-            weight: cfg.weight,
-            rawContribution: normalized * cfg.weight,
+            normalizedScore,
+            weight: weightConfig.weight,
+            rawContribution: normalizedScore * weightConfig.weight,
+            min,
+            max,
+            direction: weightConfig.direction,
           };
         });
 
-        const totalRaw = Object.values(parameterScores).reduce((s, v) => s + (v.rawContribution || 0), 0);
-        const totalPossible = Object.values(parameterScores).reduce((s, v) => s + (v.weight || 0), 0);
-        const score = totalPossible > 0 ? (totalRaw / totalPossible) * 100 : 0;
+        const totalRawScore = Object.values(parameterScores).reduce(
+          (sum, score) => sum + score.rawContribution,
+          0
+        );
+        const totalPossibleScore = Object.values(parameterScores).reduce(
+          (sum, score) => sum + score.weight,
+          0
+        );
 
-        return { ...quote, score, parameterScores, enabledParamCount: Object.keys(parameterScores).length };
+        const finalScore =
+          totalPossibleScore > 0
+            ? (totalRawScore / totalPossibleScore) * 100
+            : 0;
+
+        Object.keys(parameterScores).forEach((key) => {
+          if (totalRawScore > 0) {
+            parameterScores[key].contribution =
+              (parameterScores[key].rawContribution / totalRawScore) * 100;
+          } else {
+            parameterScores[key].contribution = 0;
+          }
+        });
+
+        return {
+          ...quote,
+          score: finalScore,
+          parameterScores,
+          enabledParamCount: enabledParams.length,
+          rawWeightedSum: totalRawScore,
+          totalWeights: totalPossibleScore,
+        };
       })
-      .sort((a, b) => (b.score || 0) - (a.score || 0));
-    return scored;
+      .sort((a, b) => b.score - a.score);
   };
 
   const handleWeightsApplied = (weights) => {
@@ -119,19 +346,27 @@ export default function ComparisonDashboard({ briefingId }) {
     const scored = calculateScores(weights);
     setScoredQuotes(scored);
     setShowWeightConfig(false);
-    if (briefingId) localStorage.setItem(`quotely_weights_${briefingId}`, JSON.stringify(weights));
+
+    localStorage.setItem(
+      `quotely_weights_${briefingId}`,
+      JSON.stringify(weights)
+    );
   };
 
   useEffect(() => {
-    if (!briefingId) return;
-    const saved = localStorage.getItem(`quotely_weights_${briefingId}`);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setUserWeights(parsed);
-        setScoredQuotes(calculateScores(parsed));
-      } catch (e) {
-        console.warn("Failed to parse saved weights:", e);
+    if (briefingId) {
+      const savedWeights = localStorage.getItem(
+        `quotely_weights_${briefingId}`
+      );
+      if (savedWeights) {
+        try {
+          const parsedWeights = JSON.parse(savedWeights);
+          setUserWeights(parsedWeights);
+          const scored = calculateScores(parsedWeights);
+          setScoredQuotes(scored);
+        } catch (error) {
+          console.error("Error loading saved weights:", error);
+        }
       }
     }
   }, [briefingId]);
@@ -139,158 +374,895 @@ export default function ComparisonDashboard({ briefingId }) {
   const resetWeights = () => {
     setUserWeights(null);
     setScoredQuotes([]);
-    if (briefingId) localStorage.removeItem(`quotely_weights_${briefingId}`);
+    if (briefingId) {
+      localStorage.removeItem(`quotely_weights_${briefingId}`);
+    }
   };
 
-  const bestPrice = (() => {
-    const valid = quotes.filter((q) => q.total_price != null && !isNaN(q.total_price));
-    if (!valid.length) return null;
-    const min = Math.min(...valid.map((q) => q.total_price));
-    const q = valid.find((x) => x.total_price === min);
-    return { value: min, supplier: q?.supplier_name || "Unknown", currency: q?.currency || "USD", quote: q };
-  })();
+  // Calculate best values
+  const getBestPrice = () => {
+    const validQuotes = quotes.filter(
+      (q) => q.total_price && !isNaN(q.total_price)
+    );
+    if (!validQuotes.length) return null;
 
-  const bestLead = (() => {
-    const valid = quotes.filter((q) => q.lead_time_days != null && !isNaN(q.lead_time_days));
-    if (!valid.length) return null;
-    const min = Math.min(...valid.map((q) => q.lead_time_days));
-    const q = valid.find((x) => x.lead_time_days === min);
-    return { value: min, supplier: q?.supplier_name || "Unknown", quote: q };
-  })();
+    const minPrice = Math.min(...validQuotes.map((q) => q.total_price));
+    const bestQuote = validQuotes.find((q) => q.total_price === minPrice);
+    return {
+      value: minPrice,
+      supplier: bestQuote?.supplier_name || "Unknown",
+      currency: bestQuote?.currency || "USD",
+      quote: bestQuote,
+    };
+  };
 
-  const bestOverall = scoredQuotes.length ? scoredQuotes[0] : null;
-  const averagePrice = (() => {
-    const valid = quotes.filter((q) => q.total_price != null && !isNaN(q.total_price));
-    if (!valid.length) return 0;
-    return valid.reduce((s, q) => s + q.total_price, 0) / valid.length;
-  })();
+  const getBestLeadTime = () => {
+    const validQuotes = quotes.filter(
+      (q) => q.lead_time_days && !isNaN(q.lead_time_days)
+    );
+    if (!validQuotes.length) return null;
 
+    const minTime = Math.min(...validQuotes.map((q) => q.lead_time_days));
+    const bestQuote = validQuotes.find((q) => q.lead_time_days === minTime);
+    return {
+      value: minTime,
+      supplier: bestQuote?.supplier_name || "Unknown",
+      quote: bestQuote,
+    };
+  };
+
+  const getBestOverall = () => {
+    if (scoredQuotes.length > 0) {
+      const bestQuote = scoredQuotes[0];
+      return {
+        score: Math.round(bestQuote.score),
+        supplier: bestQuote.supplier_name || "Unknown",
+        quote: bestQuote,
+      };
+    }
+    return null;
+  };
+
+  const getAveragePrice = () => {
+    const validQuotes = quotes.filter(
+      (q) => q.total_price && !isNaN(q.total_price)
+    );
+    if (!validQuotes.length) return 0;
+
+    const sum = validQuotes.reduce((total, q) => total + q.total_price, 0);
+    return sum / validQuotes.length;
+  };
+
+  const bestPrice = getBestPrice();
+  const bestLeadTime = getBestLeadTime();
+  const bestOverall = getBestOverall();
+  const averagePrice = getAveragePrice();
   const availableParams = getAvailableParameters();
-  const displayQuotes = scoredQuotes.length ? scoredQuotes : quotes;
-  const filteredQuotes = displayQuotes.filter((q) => !showOnlyComplete || (q.warranty_months != null && q.lead_time_days != null));
-
-  const toggleDetails = (id) => setDetailsOpen((prev) => ({ ...prev, [id]: !prev[id] }));
-
-  if (loading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
-  if (error) return <div className="max-w-6xl mx-auto p-6"><div className="bg-red-50 rounded-lg p-4">Error Loading Quotes: {error}</div></div>;
-  if (!quotes.length) return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="bg-white rounded-xl shadow-md p-12 text-center">
-        <h3 className="text-xl font-semibold mb-2">No Quotes Yet</h3>
-        <p className="text-gray-600 mb-6">{briefingId ? "No quotes have been analyzed for this briefing yet." : "Start analyzing supplier quotes to see comparisons here."}</p>
-        <button onClick={() => (window.location.href = "/analyze")} className="bg-blue-600 text-white px-6 py-2 rounded-lg">Analyze Your First Quote</button>
-      </div>
-    </div>
+  const displayQuotes = scoredQuotes.length > 0 ? scoredQuotes : quotes;
+  const filteredQuotes = displayQuotes.filter(
+    (q) =>
+      !showOnlyComplete ||
+      (q.warranty_months != null && q.lead_time_days != null)
   );
+
+  const copyToClipboard = (content) => {
+    try {
+      navigator.clipboard.writeText(content);
+      alert("Copied to clipboard!");
+    } catch (e) {
+      console.warn("Clipboard write failed", e);
+    }
+  };
+
+  // Track expanded details for mobile cards
+  const [detailsOpen, setDetailsOpen] = useState({});
+
+  const toggleDetails = (id) => {
+    setDetailsOpen((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const inputMethodLabels = {
+    email: "📧 Email",
+    pdf: "📄 PDF",
+    manual_user: "✍️ Manual (User)",
+    manual_supplier: "🔗 Supplier Link",
+  };
+
+  const formatBusinessRating = (quote) => {
+    const aj = quote?.analysis_json || {};
+    const value = aj.business_rating_value;
+    const scale = aj.business_rating_scale || 5;
+    const reviews = aj.business_reviews_count;
+    const source = aj.business_rating_source;
+    const url = aj.business_profile_url;
+    if (!value) return null;
+    const parts = [`${value}/${scale}`];
+    if (reviews) parts.push(`${reviews} reviews`);
+    if (source) parts.push(source);
+    const text = parts.join(" • ");
+    return { text, url };
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle
+            className="text-red-600 dark:text-red-400 mt-0.5"
+            size={20}
+          />
+          <div>
+            <h3 className="font-semibold text-red-900 dark:text-red-100">
+              Error Loading Quotes
+            </h3>
+            <p className="text-red-700 dark:text-red-200 text-sm mt-1">
+              {error}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!quotes.length) {
+    return (
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center border border-gray-200 dark:border-gray-700">
+          <div className="text-gray-400 dark:text-gray-500 mb-4">
+            <svg
+              className="mx-auto h-16 w-16"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            No Quotes Yet
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            {briefingId
+              ? "No quotes have been analyzed for this briefing yet."
+              : "Start analyzing supplier quotes to see comparisons here."}
+          </p>
+          <button
+            onClick={() => (window.location.href = "/analyze")}
+            className="bg-blue-600 dark:bg-blue-700 text-white px-6 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition"
+          >
+            Analyze Your First Quote
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">
-      <div className="bg-gradient-to-br from-white to-gray-50 rounded-3xl shadow p-6 border">
-        <div className="flex flex-col lg:flex-row lg:justify-between gap-6 mb-8">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-3xl shadow-xl p-6 md:p-8 border border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-6 mb-8">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-4">
-              <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl p-3"><BarChart3 className="text-white" size={28} /></div>
+              <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl p-3">
+                <BarChart3 className="text-white" size={28} />
+              </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Quote Analysis</h1>
+                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
+                  Quote Analysis
+                </h1>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">{quotes.length} {quotes.length === 1 ? "Quote" : "Quotes"}</span>
-                  {userWeights && <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-semibold">🎯 Personalized</span>}
+                  <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full text-sm font-semibold">
+                    {quotes.length} {quotes.length === 1 ? "Quote" : "Quotes"}
+                  </span>
+                  {userWeights && (
+                    <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-3 py-1 rounded-full text-sm font-semibold">
+                      🎯 Personalized
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
-            <p className="text-lg text-gray-600">{briefingId && quotes[0]?.briefings?.title ? `Analyzing quotes for "${quotes[0].briefings.title}"` : "Smart comparison of all your supplier quotes with personalized scoring"}</p>
+            <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed max-w-2xl">
+              {briefingId && quotes[0]?.briefings?.title
+                ? `Analyzing quotes for "${quotes[0].briefings.title}"`
+                : "Smart comparison of all your supplier quotes with personalized scoring"}
+            </p>
           </div>
-
           <div className="flex flex-col sm:flex-row gap-3">
-            <button onClick={() => generateQuotesPDF(displayQuotes, quotes[0]?.briefings?.title, userWeights, availableParams)} className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-xl">
-              <Download size={16} /> Download PDF
+            <button
+              onClick={() =>
+                generateQuotesPDF(
+                  displayQuotes,
+                  quotes[0]?.briefings?.title,
+                  userWeights,
+                  availableParams
+                )
+              }
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-orange-600 to-red-600 dark:from-orange-700 dark:to-red-700 text-white px-6 py-3 rounded-xl hover:from-orange-700 hover:to-red-700 dark:hover:from-orange-800 dark:hover:to-red-800 transition font-semibold shadow-lg transform hover:scale-105"
+            >
+              <Download size={20} />
+              <span className="hidden sm:inline">Download PDF</span>
+              <span className="sm:hidden">PDF</span>
             </button>
-            {userWeights && <button onClick={resetWeights} className="px-4 py-2 bg-white border rounded-xl">Reset Priorities</button>}
-            <button onClick={() => setShowWeightConfig(!showWeightConfig)} className="px-4 py-2 bg-blue-600 text-white rounded-xl">{userWeights ? "Adjust Priorities" : "Set Priorities"}</button>
+            {userWeights && (
+              <button
+                onClick={resetWeights}
+                className="px-4 py-2.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-600 transition font-medium shadow-sm"
+              >
+                Reset Priorities
+              </button>
+            )}
+            <button
+              onClick={() => setShowWeightConfig(!showWeightConfig)}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 dark:hover:from-blue-800 dark:hover:to-purple-800 transition font-semibold shadow-lg transform hover:scale-105"
+            >
+              <Settings size={20} />
+              <span className="hidden sm:inline">
+                {userWeights ? "Adjust Priorities" : "Set Priorities"}
+              </span>
+              <span className="sm:hidden">
+                {userWeights ? "Adjust" : "Configure"}
+              </span>
+            </button>
           </div>
         </div>
 
-        {/* Summary cards */}
+        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 bg-emerald-50 rounded-2xl">
+          <div className="group bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-900/20 dark:via-green-900/20 dark:to-teal-900/20 rounded-2xl p-6 border border-emerald-200 dark:border-emerald-800 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-emerald-600 font-bold uppercase">Best Price</p>
-                <p className="text-2xl font-bold mt-2">{bestPrice ? `${bestPrice.currency} ${bestPrice.value.toLocaleString()}` : "—"}</p>
-                <p className="text-sm mt-1">{bestPrice?.supplier || "No data"}</p>
-              </div>
-              <Trophy className="text-white bg-emerald-600 rounded-xl p-2" size={34} />
-            </div>
-          </div>
-
-          <div className="p-6 bg-purple-50 rounded-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-purple-600 font-bold uppercase">{userWeights ? "🎯 Best Match" : "Smart Ranking"}</p>
-                <p className="text-2xl font-bold mt-2">{userWeights && bestOverall ? `${Math.round(bestOverall.score)}%` : "—"}</p>
-                <p className="text-sm mt-1">{bestOverall?.supplier_name || "No data"}</p>
-              </div>
-              <Crown className="text-white bg-purple-600 rounded-xl p-2" size={34} />
-            </div>
-          </div>
-
-          <div className="p-6 bg-blue-50 rounded-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-600 font-bold uppercase">Best Lead Time</p>
-                <p className="text-2xl font-bold mt-2">{bestLead ? `${bestLead.value} days` : "—"}</p>
-                <p className="text-sm mt-1">{bestLead?.supplier || "No data"}</p>
-              </div>
-              <Award className="text-white bg-blue-600 rounded-xl p-2" size={34} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Weight configuration */}
-      {showWeightConfig && <WeightConfiguration initialWeights={userWeights} onApply={handleWeightsApplied} onCancel={() => setShowWeightConfig(false)} />}
-
-      {/* Quotes list */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">Analyzed Quotes ({filteredQuotes.length})</h3>
-          <div className="flex items-center gap-3">
-            <label className="text-sm">Show only complete</label>
-            <input type="checkbox" checked={showOnlyComplete} onChange={(e)=>setShowOnlyComplete(e.target.checked)} />
-          </div>
-        </div>
-
-        <div className="divide-y">
-          {filteredQuotes.map((q) => (
-            <div key={q.id} className="p-4 flex flex-col md:flex-row md:justify-between gap-3">
               <div className="flex-1">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h4 className="font-medium">{q.supplier_name || "Unknown Supplier"}</h4>
-                    <p className="text-sm text-gray-500">{q.contact_email || "No contact"}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{q.total_price ? `${q.currency || "USD"} ${Number(q.total_price).toLocaleString()}` : "—"}</p>
-                    <p className="text-sm text-gray-500">{q.lead_time_days ? `${q.lead_time_days} days` : "—"}</p>
-                  </div>
+                <div className="flex items-center gap-2 mb-3">
+                  <DollarSign
+                    className="text-emerald-600 dark:text-emerald-400"
+                    size={20}
+                  />
+                  <p className="text-sm text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wide">
+                    Best Price
+                  </p>
                 </div>
-
-                {detailsOpen[q.id] && (
-                  <div className="mt-3 text-sm text-gray-700">
-                    <pre className="whitespace-pre-wrap">{q.raw_email_text || q.analysis_json && JSON.stringify(q.analysis_json, null, 2) || "No details"}</pre>
-                  </div>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                  {bestPrice
+                    ? `${
+                        bestPrice.currency
+                      } ${bestPrice.value.toLocaleString()}`
+                    : "—"}
+                </p>
+                <p className="text-emerald-700 dark:text-emerald-300 font-semibold text-sm">
+                  {bestPrice?.supplier || "No data available"}
+                </p>
+                {bestPrice && averagePrice && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
+                    {((1 - bestPrice.value / averagePrice) * 100).toFixed(1)}%
+                    below average
+                  </p>
                 )}
               </div>
-
-              <div className="flex flex-col items-end gap-2">
-                <div className="text-xs text-gray-500">Input: {q.input_method}</div>
-                <div className="text-sm font-medium">{q.score ? `${Math.round(q.score)}%` : "—"}</div>
-                <button onClick={()=>toggleDetails(q.id)} className="text-sm text-blue-600">{detailsOpen[q.id] ? "Hide" : "Details"}</button>
+              <div className="bg-gradient-to-br from-emerald-500 to-green-600 dark:from-emerald-600 dark:to-green-700 rounded-2xl p-4 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Trophy className="text-white" size={32} />
               </div>
             </div>
-          ))}
+          </div>
+
+          <div className="group bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 dark:from-purple-900/20 dark:via-indigo-900/20 dark:to-blue-900/20 rounded-2xl p-6 border border-purple-200 dark:border-purple-800 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <Crown
+                    className="text-purple-600 dark:text-purple-400"
+                    size={20}
+                  />
+                  <p className="text-sm text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wide">
+                    {userWeights ? "🎯 Best Match" : "Smart Ranking"}
+                  </p>
+                </div>
+                {userWeights && bestOverall ? (
+                  <>
+                    <p className="text-3xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                      {bestOverall.score}%
+                    </p>
+                    <p className="text-purple-700 dark:text-purple-300 font-semibold text-sm">
+                      {bestOverall.supplier}
+                    </p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                      Matches your priorities
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                      —
+                    </p>
+                    <p className="text-purple-600 dark:text-purple-400 text-sm font-medium">
+                      Set priorities for smart ranking
+                    </p>
+                    <p className="text-xs text-purple-500 dark:text-purple-400 mt-2">
+                      Click "Set Priorities" above
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="bg-gradient-to-br from-purple-500 to-indigo-600 dark:from-purple-600 dark:to-indigo-700 rounded-2xl p-4 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Star className="text-white" size={32} />
+              </div>
+            </div>
+          </div>
+
+          <div className="group bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50 dark:from-sky-900/20 dark:via-blue-900/20 dark:to-cyan-900/20 rounded-2xl p-6 border border-sky-200 dark:border-sky-800 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="text-sky-600 dark:text-sky-400" size={20} />
+                  <p className="text-sm text-sky-600 dark:text-sky-400 font-bold uppercase tracking-wide">
+                    Fastest Delivery
+                  </p>
+                </div>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
+                  {bestLeadTime ? `${bestLeadTime.value} days` : "—"}
+                </p>
+                <p className="text-sky-700 dark:text-sky-300 font-semibold text-sm">
+                  {bestLeadTime?.supplier || "No data available"}
+                </p>
+                {bestLeadTime && (
+                  <p className="text-xs text-sky-600 dark:text-sky-400 mt-2">
+                    Ready in{" "}
+                    {bestLeadTime.value < 7
+                      ? "under a week"
+                      : bestLeadTime.value < 30
+                      ? "under a month"
+                      : "over a month"}
+                  </p>
+                )}
+              </div>
+              <div className="bg-gradient-to-br from-sky-500 to-blue-600 dark:from-sky-600 dark:to-blue-700 rounded-2xl p-4 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Zap className="text-white" size={32} />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab("overview")}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold border ${
+            activeTab === "overview"
+              ? "bg-blue-600 text-white border-blue-600"
+              : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => setActiveTab("calculations")}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold border ${
+            activeTab === "calculations"
+              ? "bg-blue-600 text-white border-blue-600"
+              : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+          }`}
+        >
+          Calculations
+        </button>
+      </div>
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-5 space-y-6">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Filters */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-gray-900 dark:text-white text-lg">
+                  Quote Comparison
+                </h3>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyComplete}
+                    onChange={() => setShowOnlyComplete(!showOnlyComplete)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                    Complete data only
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="p-6">
+              <div>
+                {/* Table for md+ screens */}
+                <div className="hidden md:block overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  <table className="w-full text-sm table-auto border-collapse bg-white dark:bg-gray-800">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                          Metric
+                        </th>
+                        {filteredQuotes.map((quote, index) => (
+                          <th key={quote.id} className="text-center py-3 px-2">
+                            <div className="flex flex-col items-center">
+                              <span className="font-semibold text-gray-900 dark:text-white text-xs">
+                                {quote.supplier_name?.split(" ")[0] ||
+                                  `S${index + 1}`}
+                              </span>
+                              {userWeights && quote.score && (
+                                <span className="text-xs text-purple-600 dark:text-purple-400 font-medium mt-1">
+                                  {Math.round(quote.score)}%
+                                </span>
+                              )}
+                              <span className="text-xs italic text-gray-500">
+                                {inputMethodLabels[quote.input_method] || "—"}
+                              </span>
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      {activeTab === "calculations" && userWeights ? (
+                        <>
+                          {Object.keys(
+                            getAvailableParameters().reduce((acc, p) => {
+                              acc[p.key] = p;
+                              return acc;
+                            }, {})
+                          ).map((paramKey) => (
+                            <tr
+                              key={`calc-${paramKey}`}
+                              className="hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                            >
+                              <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                                {getAvailableParameters().find((p) => p.key === paramKey)?.name ||
+                                  paramKey}
+                              </td>
+                              {filteredQuotes.map((quote) => {
+                                const ps = quote.parameterScores?.[paramKey];
+                                return (
+                                  <td
+                                    key={`${quote.id}-${paramKey}`}
+                                    className="py-3 px-2 text-center text-xs text-gray-700 dark:text-gray-300"
+                                    title={
+                                      ps
+                                        ? `val=${ps.originalValue} | norm=${ps.normalizedScore.toFixed(2)} | weight=${ps.weight} | contrib=${ps.rawContribution.toFixed(
+                                            2
+                                          )} | min=${ps.min} max=${ps.max}`
+                                        : "No data"
+                                    }
+                                  >
+                                    {ps ? (
+                                      <div className="flex flex-col items-center gap-0.5">
+                                        <span>
+                                          {Number(ps.originalValue)}
+                                        </span>
+                                        <span className="text-gray-500 dark:text-gray-400">
+                                          n={ps.normalizedScore.toFixed(2)} w={ps.weight}
+                                        </span>
+                                        <span className="text-gray-500 dark:text-gray-400">
+                                          contrib={ps.rawContribution.toFixed(2)}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                          <tr className="bg-gray-50 dark:bg-gray-700/40 border-t border-gray-200 dark:border-gray-600">
+                            <td className="py-3 font-bold text-gray-800 dark:text-gray-200 text-xs">
+                              Final Weighted Sum
+                            </td>
+                            {filteredQuotes.map((quote) => (
+                              <td
+                                key={`sum-${quote.id}`}
+                                className="py-3 px-2 text-center text-xs text-gray-900 dark:text-gray-100 font-semibold"
+                                title={`rawWeightedSum=${quote.rawWeightedSum?.toFixed(3) || 0} totalWeights=${quote.totalWeights || 0}`}
+                              >
+                                {quote.rawWeightedSum != null && quote.totalWeights > 0 ? (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <span>{quote.rawWeightedSum.toFixed(2)}</span>
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                      / {quote.totalWeights.toFixed(2)}
+                                    </span>
+                                    <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                      {Math.round(quote.score)}%
+                                    </span>
+                                  </div>
+                                ) : (
+                                  "—"
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        </>
+                      ) : (
+                        <>
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Business Rating
+                        </td>
+                        {filteredQuotes.map((quote) => {
+                          const rating = formatBusinessRating(quote);
+                          return (
+                            <td
+                              key={quote.id}
+                              className="py-3 px-2 text-center text-xs text-gray-700 dark:text-gray-300"
+                            >
+                              {rating ? (
+                                rating.url ? (
+                                  <a
+                                    href={rating.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                                  >
+                                    {rating.text}
+                                  </a>
+                                ) : (
+                                  rating.text
+                                )
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Price
+                        </td>
+                        {filteredQuotes.map((quote) => (
+                          <td
+                            key={quote.id}
+                            className="py-3 px-2 text-center font-semibold text-xs"
+                          >
+                            {quote.total_price
+                              ? `${quote.currency || "USD"} ${
+                                  quote.total_price
+                                }`
+                              : "—"}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Lead Time
+                        </td>
+                        {filteredQuotes.map((quote) => (
+                          <td
+                            key={quote.id}
+                            className="py-3 px-2 text-center text-xs"
+                          >
+                            {quote.lead_time_days
+                              ? `${quote.lead_time_days}d`
+                              : "—"}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Warranty (Months)
+                        </td>
+                        {filteredQuotes.map((quote) => (
+                          <td
+                            key={quote.id}
+                            className="py-3 px-2 text-center text-xs"
+                          >
+                            {quote.warranty_months != null
+                              ? `${quote.warranty_months}m`
+                              : "—"}
+                          </td>
+                        ))}
+                      </tr>
+
+                      {/* Show warranty_period as textual info */}
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Warranty Details
+                        </td>
+                        {filteredQuotes.map((quote) => (
+                          <td
+                            key={quote.id}
+                            className="py-3 px-2 text-center text-xs text-gray-600 dark:text-gray-400"
+                            title={
+                              quote.warranty_period || "No warranty details"
+                            }
+                            style={{ whiteSpace: "normal" }}
+                          >
+                            {quote.warranty_period || "—"}
+                          </td>
+                        ))}
+                      </tr>
+
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Shipping Cost
+                        </td>
+                        {filteredQuotes.map((quote) => (
+                          <td
+                            key={quote.id}
+                            className="py-3 px-2 text-center text-xs"
+                          >
+                            {quote.shipping_cost != null
+                              ? `${quote.currency || "USD"} ${
+                                  quote.shipping_cost
+                                }`
+                              : "—"}
+                          </td>
+                        ))}
+                      </tr>
+
+                      {/* Show payment_terms (textual) */}
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td className="py-3 font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          Payment Terms
+                        </td>
+                        {filteredQuotes.map((quote) => (
+                          <td
+                            key={quote.id}
+                            className="py-3 px-2 text-center text-xs text-gray-600 dark:text-gray-400"
+                            title={quote.payment_terms || "No payment terms"}
+                            style={{ whiteSpace: "normal" }}
+                          >
+                            {quote.payment_terms || "—"}
+                          </td>
+                        ))}
+                      </tr>
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile: stacked quote cards */}
+                <div className="md:hidden space-y-4">
+                  {filteredQuotes.map((quote) => (
+                    <div
+                      key={quote.id}
+                      className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="font-semibold text-gray-900 dark:text-white">
+                            {quote.supplier_name || "Unknown Supplier"}
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {inputMethodLabels[quote.input_method] || "—"}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-sm text-gray-900 dark:text-white">
+                            {quote.total_price
+                              ? `${quote.currency || "USD"} ${
+                                  quote.total_price
+                                }`
+                              : "—"}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {quote.lead_time_days
+                              ? `${quote.lead_time_days}d`
+                              : "—"}
+                          </p>
+                        </div>
+                      </div>
+                      {/* Details collapsed by default on mobile; toggle to view */}
+                      {detailsOpen[quote.id] && (
+                        <div className="mt-3 text-sm text-gray-600 dark:text-gray-300">
+                          {formatBusinessRating(quote) && (
+                            <p className="mb-1">
+                              <strong>Business Rating:</strong>{" "}
+                              {(() => {
+                                const r = formatBusinessRating(quote);
+                                if (!r) return "—";
+                                return r.url ? (
+                                  <a
+                                    href={r.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                                  >
+                                    {r.text}
+                                  </a>
+                                ) : (
+                                  r.text
+                                );
+                              })()}
+                            </p>
+                          )}
+                          <p>
+                            <strong>Warranty:</strong>{" "}
+                            {quote.warranty_months != null
+                              ? `${quote.warranty_months}m`
+                              : "—"}
+                          </p>
+                          <p className="mt-1">
+                            <strong>Shipping:</strong>{" "}
+                            {quote.shipping_cost != null
+                              ? `${quote.currency || "USD"} ${
+                                  quote.shipping_cost
+                                }`
+                              : "—"}
+                          </p>
+                          <p className="mt-1">
+                            <strong>Payment:</strong>{" "}
+                            {quote.payment_terms || "—"}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() =>
+                            copyToClipboard(
+                              JSON.stringify(quote.analysis_json, null, 2)
+                            )
+                          }
+                          className="flex-1 px-3 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs hover:bg-blue-200 dark:hover:bg-blue-900/50 transition"
+                        >
+                          Copy JSON
+                        </button>
+                        <button
+                          onClick={() => toggleDetails(quote.id)}
+                          className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-800/20 text-gray-800 dark:text-gray-200 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-700/50 transition"
+                        >
+                          {detailsOpen[quote.id] ? "Hide Details" : "Details"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Weight Configuration */}
+        <div className="lg:col-span-7">
+          {showWeightConfig && availableParams.length > 0 ? (
+            <WeightConfiguration
+              availableParams={availableParams}
+              onWeightsApplied={handleWeightsApplied}
+              initialWeights={userWeights}
+            />
+          ) : (
+            <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6">
+                <div className="flex items-center gap-4">
+                  <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3">
+                    <Settings className="text-white" size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-white mb-1">
+                      Smart Quote Ranking
+                    </h3>
+                    <p className="text-blue-100">Personalize your comparison</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-8">
+                <div className="max-w-lg mx-auto text-center">
+                  <div className="grid grid-cols-3 gap-4 mb-8">
+                    <div className="bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-xl p-4">
+                      <DollarSign
+                        className="text-green-600 dark:text-green-400 mx-auto mb-2"
+                        size={24}
+                      />
+                      <p className="text-xs font-semibold text-green-700 dark:text-green-300">
+                        Price Weight
+                      </p>
+                    </div>
+                    <div className="bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-900/30 dark:to-sky-900/30 rounded-xl p-4">
+                      <Clock
+                        className="text-blue-600 dark:text-blue-400 mx-auto mb-2"
+                        size={24}
+                      />
+                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+                        Speed Priority
+                      </p>
+                    </div>
+                    <div className="bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl p-4">
+                      <Award
+                        className="text-purple-600 dark:text-purple-400 mx-auto mb-2"
+                        size={24}
+                      />
+                      <p className="text-xs font-semibold text-purple-700 dark:text-purple-300">
+                        Quality Focus
+                      </p>
+                    </div>
+                  </div>
+                  <h4 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
+                    Set Your Priorities
+                  </h4>
+                  <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+                    Configure importance weights for different criteria to get
+                    personalized recommendations. Our smart algorithm will rank
+                    quotes based on what matters most to you.
+                  </p>
+                  <div className="space-y-4">
+                    <button
+                      onClick={() => setShowWeightConfig(true)}
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-8 rounded-xl hover:from-blue-700 hover:to-purple-700 transition font-semibold text-lg shadow-lg transform hover:scale-105"
+                    >
+                      Configure Priorities
+                    </button>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Takes less than 2 minutes • Improves accuracy by 70%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Personalized Score Explanation */}
+      {userWeights && (
+        <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 dark:from-purple-900/20 dark:via-indigo-900/20 dark:to-blue-900/20 rounded-2xl border border-purple-200 dark:border-purple-800 overflow-hidden shadow-lg">
+          <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 dark:from-purple-500/20 dark:to-blue-500/20 p-6">
+            <div className="flex items-start gap-4">
+              <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl p-3 flex-shrink-0">
+                <Crown className="text-white" size={28} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <h3 className="font-bold text-purple-800 dark:text-purple-100 text-lg">
+                    🎯 Smart Ranking Active
+                  </h3>
+                  <span className="bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200 px-2 py-1 rounded-full text-xs font-semibold">
+                    Personalized
+                  </span>
+                </div>
+                <p className="text-purple-700 dark:text-purple-200 leading-relaxed">
+                  Quotes are intelligently ranked using your custom priority
+                  weights. The "Best Match" represents optimal value based on
+                  what matters most to you.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {Object.entries(userWeights)
+                    .filter(([_, config]) => config.enabled)
+                    .map(([key, config]) => (
+                      <span
+                        key={key}
+                        className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm text-purple-700 dark:text-purple-300 px-3 py-1 rounded-full text-xs font-medium border border-purple-200 dark:border-purple-700"
+                      >
+                        {config.name}: {config.weight}%
+                      </span>
+                    ))}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWeightConfig(true)}
+                className="bg-white/20 dark:bg-gray-800/20 backdrop-blur-sm text-purple-700 dark:text-purple-300 px-3 py-2 rounded-lg hover:bg-white/30 dark:hover:bg-gray-800/30 transition text-sm font-medium border border-purple-200/50 dark:border-purple-700/50"
+              >
+                Adjust
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
