@@ -315,6 +315,63 @@ export default function BriefingChat({
     ]);
   };
 
+  // --- NEW: Supplier search handling ---
+  const [showSupplierPrompt, setShowSupplierPrompt] = useState(false);
+  const [lastCollectedInfo, setLastCollectedInfo] = useState(null);
+  const [searchingSuppliers, setSearchingSuppliers] = useState(false);
+
+  // --- NEW: handle supplier search
+  const handleSupplierSearch = async (choice) => {
+    setShowSupplierPrompt(false);
+    if (choice !== "yes") return;
+    if (!lastCollectedInfo) return;
+    setSearchingSuppliers(true);
+    try {
+      appendMessage({ role: "AI", content: "🔎 Searching for potential suppliers..." });
+
+      // NOTE: use conversation base route 
+      const res = await fetch(`${API_URL}/search-suppliers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ collectedInfo: lastCollectedInfo }),
+      });
+
+      const payload = await res.json();
+      setSearchingSuppliers(false);
+
+      if (!res.ok) {
+        const errorMsg = payload.error || `Error ${res.status}`;
+        throw new Error(errorMsg);
+      }
+
+      // Show found suppliers
+      const suppliers = payload.suppliers || [];
+      if (suppliers.length === 0) {
+        appendMessage({
+          role: "AI",
+          content: "No suppliers found matching your criteria.",
+        });
+      } else {
+        let suppliersMsg = "I found some suppliers that match your request:\n\n";
+        suppliers.forEach((supplier, index) => {
+          suppliersMsg += `${index + 1}. ${supplier.name} - ${supplier.contact}\n`;
+        });
+        suppliersMsg += "\nWould you like to contact any of these suppliers?";
+        appendMessage({
+          role: "AI",
+          content: suppliersMsg,
+        });
+      }
+    } catch (error) {
+      console.error("Supplier search error:", error);
+      appendMessage({
+        role: "AI",
+        content: `❌ Failed to search suppliers: ${error.message}`,
+      });
+      setSearchingSuppliers(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-3xl mx-auto p-4 sm:p-6 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg mt-6 bg-white dark:bg-gray-800">
       <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
@@ -428,6 +485,50 @@ export default function BriefingChat({
           })
         }
       />
+
+      {/* --- NEW: Supplier search prompt --- */}
+      {showSupplierPrompt && (
+        <div className="mt-4 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 text-yellow-900 dark:text-yellow-100 border-l-4 border-yellow-400 dark:border-yellow-500">
+          <p className="text-sm">
+            I can help you find suppliers for your request. Would you like to
+            search for potential suppliers now?
+          </p>
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => handleSupplierSearch("yes")}
+              className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            >
+              Yes, find suppliers
+            </button>
+            <button
+              onClick={() => handleSupplierSearch("no")}
+              className="flex-1 px-4 py-2 rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400 transition-colors"
+            >
+              No, thanks
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --- NEW: Searching suppliers state --- */}
+      {searchingSuppliers && (
+        <div className="mt-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100">
+          <div className="flex items-center gap-2">
+            <div className="animate-pulse">Searching for suppliers...</div>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-blue-400 dark:bg-blue-300 rounded-full animate-bounce"></div>
+              <div
+                className="w-2 h-2 bg-blue-400 dark:bg-blue-300 rounded-full animate-bounce"
+                style={{ animationDelay: "0.1s" }}
+              ></div>
+              <div
+                className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                style={{ animationDelay: "0.2s" }}
+              ></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

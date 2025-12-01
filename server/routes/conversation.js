@@ -288,5 +288,69 @@ Make it formal, clear, and ready to send to suppliers.
     }
   });
 
+  // for live web search tool
+  const groundingTool = {
+    googleSearch:{}
+  }
+
+  const config = {
+    tools: [groundingTool],
+  };
+
+  // NEW: Search suppliers (AI-only suggestions; SerpAPI removed)
+  router.post("/search-suppliers", async (req, res) => {
+    const { collectedInfo } = req.body;
+    if (!collectedInfo || !collectedInfo.description) {
+      return res.status(400).json({ error: "collectedInfo.description required" });
+    }
+
+    try {
+      const prompt = `
+You are an assistant that helps find suppliers for a buyer's RFQ.
+
+BRIEF: ${collectedInfo.description}
+
+Return valid JSON ONLY with two keys:
+{
+  "queries": ["short search query 1", "query 2", ...],
+  "suggested_suppliers": ["Supplier A", "supplierb.com", ...]
+}
+Generate up to 5 concise search queries (3-6 words each) and up to 5 suggested supplier names/domains.
+`;
+
+      const aiResp = await retryWithBackoff(() =>
+        ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config,
+        })
+      );
+
+      let aiText = (aiResp && aiResp.text) ? aiResp.text.trim() : "";
+      let aiJson = { queries: [], suggested_suppliers: [] };
+      try {
+        const start = aiText.indexOf("{");
+        aiJson = start !== -1 ? JSON.parse(aiText.slice(start)) : JSON.parse(aiText);
+      } catch (e) {
+        // best-effort fallback parsing
+        try {
+          const match = aiText.match(/\{[\s\S]*\}/);
+          if (match) aiJson = JSON.parse(match[0]);
+        } catch (e2) {
+          console.warn("Failed to parse AI output as JSON; returning empty suggestions");
+        }
+      }
+
+      res.json({
+        queries: aiJson.queries || [],
+        suggested_suppliers: aiJson.suggested_suppliers || [],
+        note: "AI suggestions with web search tool config for gemini",
+      });
+    } catch (err) {
+      console.error("Error in /search-suppliers:", err);
+      res.status(500).json({ error: "Failed to search suppliers", details: err.message || String(err) });
+    }
+  });
+
   return router;
 }
