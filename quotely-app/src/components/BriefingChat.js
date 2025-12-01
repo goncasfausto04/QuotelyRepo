@@ -318,48 +318,99 @@ export default function BriefingChat({
   };
 
   // --- NEW: Supplier search handling ---
-  const [showSupplierPrompt, setShowSupplierPrompt] = useState(false);
   const [lastCollectedInfo, setLastCollectedInfo] = useState(null);
+  const [showSupplierPrompt, setShowSupplierPrompt] = useState(false);
   const [searchingSuppliers, setSearchingSuppliers] = useState(false);
+  const [askingLocation, setAskingLocation] = useState(false);
+  const [locationInput, setLocationInput] = useState("");
+  const [supplierResults, setSupplierResults] = useState([]);
 
   // --- NEW: handle supplier search
   const handleSupplierSearch = async (choice) => {
     setShowSupplierPrompt(false);
     if (!lastCollectedInfo) return;
+
+    // If user wants search but we don't have a location, ask for it
+    if (choice === "yes" && !lastCollectedInfo.location && !askingLocation) {
+      setAskingLocation(true);
+      appendMessage({ role: "AI", content: "Where should I look for suppliers? Please provide city, region or postal code (or type 'any')." });
+      return;
+    }
+
+    // If we're asking for location and user provided it via UI, ensure it's set
+    const location = choice === "location-submitted" ? locationInput.trim() : (lastCollectedInfo.location || (choice === "yes" ? null : null));
+
     setSearchingSuppliers(true);
     try {
-      if (choice === "yes") {
-        appendMessage({ role: "AI", content: "🔎 Searching for potential suppliers..." });
-
-        const res = await fetch(`${API_URL}/search-suppliers`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ collectedInfo: lastCollectedInfo }),
-        });
-
-        const payload = await res.json().catch(() => ({}));
-
-        if (!res.ok) {
-          throw new Error(payload.error || `Error ${res.status}`);
-        }
-
-        const suggestions = payload.suggested_suppliers || payload.suppliers || [];
-        const queries = payload.queries || [];
-        const parts = [];
-        if (suggestions.length) parts.push("AI suggested suppliers: " + suggestions.join(", "));
-        if (queries.length) parts.push("Search queries: " + queries.join(" | "));
-        appendMessage({ role: "AI", content: parts.join("\n\n") || "No supplier suggestions returned." });
-      } else {
-        appendMessage({ role: "AI", content: "Okay — I will not search for suppliers right now." });
+      if (choice !== "yes" && choice !== "location-submitted") {
+        appendMessage({ role: "AI", content: "Okay — not searching for suppliers right now." });
+        setAskingLocation(false);
+        setLastCollectedInfo(null);
+        return;
       }
-    } catch (error) {
-      console.error("Supplier search error:", error);
-      appendMessage({
-        role: "AI",
-        content: `❌ Failed to search suppliers: ${error.message}`,
+
+      appendMessage({ role: "AI", content: `🔎 Searching for suppliers${location ? ` near ${location}` : ""}...` });
+
+      const payloadBody = { collectedInfo: lastCollectedInfo };
+      if (location) payloadBody.location = location;
+
+      const res = await fetch(`${API_URL}/search-suppliers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payloadBody),
       });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || `Status ${res.status}`);
+
+      const suppliers = payload.suppliers || [];
+      const queries = payload.queries || [];
+
+      if (suppliers.length) {
+        // render suppliers in chat with clear labeled fields and separators
+        const formatted = suppliers
+          .map((s, i) => {
+            const name = s.name || "Unknown";
+            const email = s.contact_email || "—";
+            const phone = s.phone || "—";
+            const website = s.website || "—";
+            const note = (s.note || "").trim() || "—";
+            return (
+              `${i + 1}. ${name}\n` +
+              `   • Email: ${email}\n` +
+              `   • Phone: ${phone}\n` +
+              `   • Website: ${website}\n` +
+              `   • Note: ${note}`
+            );
+          })
+          .join("\n\n---\n\n");
+
+        const header = "I found the following potential suppliers:\n\n";
+        appendMessage({ role: "AI", content: header + formatted });
+        setSupplierResults(suppliers);
+        if (typeof onSuppliersFound === "function") {
+          try {
+            onSuppliersFound({ suppliers, queries, collectedInfo: lastCollectedInfo });
+          } catch (e) {
+            console.warn("onSuppliersFound handler error:", e);
+          }
+        }
+      } else if (payload.raw_text) {
+        appendMessage({ role: "AI", content: "AI returned (raw):\n\n" + payload.raw_text });
+      } else {
+        appendMessage({ role: "AI", content: "No suppliers were returned." });
+      }
+
+      if (queries && queries.length) {
+        appendMessage({ role: "AI", content: "Useful search queries: " + queries.join(" | ") });
+      }
+    } catch (err) {
+      console.error("Supplier search failed:", err);
+      appendMessage({ role: "AI", content: `❌ Supplier search failed: ${err.message || err}` });
     } finally {
       setSearchingSuppliers(false);
+      setAskingLocation(false);
+      setLocationInput("");
       setLastCollectedInfo(null);
     }
   };
@@ -481,23 +532,20 @@ export default function BriefingChat({
       {/* --- NEW: Supplier search prompt --- */}
       {showSupplierPrompt && (
         <div className="mt-4 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 text-yellow-900 dark:text-yellow-100 border-l-4 border-yellow-400 dark:border-yellow-500">
-          <p className="text-sm">
-            I can help you find suppliers for your request. Would you like to
-            search for potential suppliers now?
-          </p>
+          <p className="text-sm">Would you like me to search for potential suppliers that match this request?</p>
           <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => handleSupplierSearch("yes")}
-              className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-            >
-              Yes, find suppliers
-            </button>
-            <button
-              onClick={() => handleSupplierSearch("no")}
-              className="flex-1 px-4 py-2 rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400 transition-colors"
-            >
-              No, thanks
-            </button>
+            <button onClick={() => handleSupplierSearch("yes")} className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white">Yes, find suppliers</button>
+            <button onClick={() => handleSupplierSearch("no")} className="flex-1 px-4 py-2 rounded-lg bg-gray-300 text-gray-700">No, thanks</button>
+          </div>
+        </div>
+      )}
+
+      {askingLocation && (
+        <div className="mt-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border dark:border-gray-700">
+          <p className="text-sm mb-2">Enter location to search nearby suppliers (city, region, or postal code):</p>
+          <div className="flex gap-2">
+            <input value={locationInput} onChange={(e)=>setLocationInput(e.target.value)} className="flex-1 p-2 rounded border dark:border-gray-700 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="e.g., Seattle, WA or 94107" />
+            <button onClick={()=>handleSupplierSearch("location-submitted")} className="px-4 py-2 bg-blue-600 text-white rounded">Search</button>
           </div>
         </div>
       )}
