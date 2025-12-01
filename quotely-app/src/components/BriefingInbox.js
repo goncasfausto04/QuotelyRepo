@@ -225,7 +225,7 @@ export default function BriefingInbox({ briefingId }) {
         total_price: analysis?.total_price || null,
         currency: analysis?.currency || null,
         lead_time_days: analysis?.lead_time_days || null,
-        input_method: "email_reply",
+        input_method: "email",
         submitted_by: "supplier",
         message_id: email.id,
       };
