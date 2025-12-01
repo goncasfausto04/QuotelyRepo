@@ -1,6 +1,7 @@
 // BriefingChat.js
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient.js";
+import BriefingEmailComposer from "./BriefingEmailComposer.js";
 
 export default function BriefingChat({
   briefingId: initialBriefingId,
@@ -416,90 +417,17 @@ export default function BriefingChat({
         </button>
       )}
 
-      {/* --- NEW: Send email panel (under the chat) --- */}
-      <div className="mt-6 p-4 border border-gray-200 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900">
-        <h3 className="font-semibold mb-2">Send email</h3>
-
-        <div className="flex items-center gap-4 mb-3">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="sendOption"
-              checked={sendOption === "generated"}
-              onChange={() => setSendOption("generated")}
-            />
-            <span className="text-sm">Use generated email</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="sendOption"
-              checked={sendOption === "custom"}
-              onChange={() => setSendOption("custom")}
-            />
-            <span className="text-sm">Use custom email</span>
-          </label>
-        </div>
-
-        {sendOption === "generated" && (
-          <div className="mb-3">
-            <textarea
-              className="w-full h-40 p-2 border rounded text-sm font-mono"
-              value={getGeneratedEmail()}
-              readOnly
-            />
-          </div>
-        )}
-
-        {sendOption === "custom" && (
-          <div className="mb-3">
-            <textarea
-              className="w-full h-40 p-2 border rounded text-sm font-mono"
-              value={customEmailText}
-              onChange={(e) => setCustomEmailText(e.target.value)}
-              placeholder="Write custom email here..."
-            />
-          </div>
-        )}
-
-        <div className="mb-3">
-          <label className="text-sm block mb-1">Recipients (comma-separated)</label>
-          <input
-            className="w-full p-2 border rounded text-sm"
-            value={recipientsText}
-            onChange={(e) => setRecipientsText(e.target.value)}
-            placeholder="supplier@example.com, sales@vendor.com"
-          />
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={sendEmailForBriefing}
-            disabled={sendLoading || (sendOption === "generated" && !getGeneratedEmail())}
-            className={`px-4 py-2 rounded font-semibold ${
-              sendLoading
-                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                : "bg-green-600 text-white hover:bg-green-700"
-            }`}
-          >
-            {sendLoading ? "Sending..." : "Send email"}
-          </button>
-
-          <button
-            onClick={() => {
-              // quick copy current body to clipboard
-              const body = sendOption === "generated" ? getGeneratedEmail() : customEmailText;
-              if (body) {
-                navigator.clipboard.writeText(body);
-                alert("Email copied to clipboard");
-              }
-            }}
-            className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-sm"
-          >
-            Copy body
-          </button>
-        </div>
-      </div>
+      {/* Email composer (extracted) */}
+      <BriefingEmailComposer
+        briefingId={briefingId}
+        getGeneratedEmail={getGeneratedEmail}
+        onSent={(recipients) =>
+          appendMessage({
+            role: "AI",
+            content: `✅ Email sent to ${recipients.join(", ")}.`,
+          })
+        }
+      />
     </div>
   );
 }
