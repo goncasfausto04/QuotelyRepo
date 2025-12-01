@@ -13,6 +13,7 @@ import {
   Send,
   AlertCircle,
 } from "lucide-react";
+import BriefingEmailComposer from "./BriefingEmailComposer.js";
 
 export default function BriefingInbox({ briefingId }) {
   const [emails, setEmails] = useState([]);
@@ -267,6 +268,14 @@ export default function BriefingInbox({ briefingId }) {
     }
   };
 
+  const handleComposerSent = (recipients) => {
+    // Refresh inbox after sending and give minimal feedback
+    fetchEmails();
+    if (recipients && recipients.length) {
+      alert(`Email sent to: ${recipients.join(", ")}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -486,6 +495,15 @@ export default function BriefingInbox({ briefingId }) {
           ))}
         </div>
       )}
+
+      {/* Email composer placed under the inbox */}
+      <div className="mt-6">
+        <BriefingEmailComposer
+          briefingId={briefingId}
+          // Not providing getGeneratedEmail here - composer still supports custom text.
+          onSent={handleComposerSent}
+        />
+      </div>
     </div>
   );
 }

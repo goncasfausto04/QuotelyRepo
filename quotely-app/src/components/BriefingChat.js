@@ -1,7 +1,7 @@
 // BriefingChat.js
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient.js";
-import BriefingEmailComposer from "./BriefingEmailComposer.js";
+// import BriefingEmailComposer from "./BriefingEmailComposer.js";
 
 export default function BriefingChat({
   briefingId: initialBriefingId,
@@ -516,18 +516,6 @@ export default function BriefingChat({
           🔄 Start New Request
         </button>
       )}
-
-      {/* Email composer (extracted) */}
-      <BriefingEmailComposer
-        briefingId={briefingId}
-        getGeneratedEmail={getGeneratedEmail}
-        onSent={(recipients) =>
-          appendMessage({
-            role: "AI",
-            content: `✅ Email sent to ${recipients.join(", ")}.`,
-          })
-        }
-      />
 
       {/* --- NEW: Supplier search prompt --- */}
       {showSupplierPrompt && (
