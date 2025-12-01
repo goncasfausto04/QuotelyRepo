@@ -217,51 +217,53 @@ export default function BriefingChat({
 
       const data = await response.json();
 
-      // CASE 2A: Conversation is complete - generate email
+      // CASE 2A: Conversation is complete - generate email THEN prompt for supplier search
       if (data.done) {
-        console.log("Conversation complete!");
-        setConversationComplete(true);
+        console.log("Conversation complete! Generating email...");
 
+        // Generate the email now
         appendMessage({
           role: "AI",
-          content:
-            "Perfect! Let me create a professional quote request email for you...",
+          content: "Perfect! Let me create a professional quote request email for you...",
         });
 
-        // Call email composition endpoint
-        const emailRes = await fetch(`${API_URL}/compose-email`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            briefingId: briefingId,
-            collectedInfo: data.collectedInfo,
-          }),
-        });
+        try {
+          const emailRes = await fetch(`${API_URL}/compose-email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              briefingId: briefingId,
+              collectedInfo: data.collectedInfo,
+            }),
+          });
 
-        if (!emailRes.ok) {
-          throw new Error(`Email generation failed: ${emailRes.status}`);
-        }
-
-        const emailData = await emailRes.json();
-
-        appendMessage({
-          role: "AI",
-          content: "✅ Here's your professional quote request email:",
-        });
-        appendMessage({
-          role: "Email",
-          content: emailData.email,
-          isEmail: true,
-        });
-
-        // Trigger supplier search if callback exists
-        if (typeof onSuppliersFound === "function") {
-          try {
-            onSuppliersFound(data.collectedInfo);
-          } catch (e) {
-            console.warn("onSuppliersFound handler error:", e);
+          const emailPayload = await emailRes.json().catch(() => ({}));
+          if (!emailRes.ok) {
+            throw new Error(emailPayload.error || `Status ${emailRes.status}`);
           }
+
+          appendMessage({
+            role: "AI",
+            content: "✅ Here's your professional quote request email:",
+          });
+          appendMessage({
+            role: "Email",
+            content: emailPayload.email,
+            isEmail: true,
+          });
+        } catch (err) {
+          console.error("Email generation failed:", err);
+          appendMessage({
+            role: "AI",
+            content: `❌ Email generation failed: ${err.message || String(err)}`,
+          });
         }
+
+        // Mark conversation complete and prompt about supplier search (after email)
+        setConversationComplete(true);
+        setLastCollectedInfo(data.collectedInfo);
+
+        setShowSupplierPrompt(true);
       }
       // CASE 2B: Ask next question
       else {
@@ -323,44 +325,32 @@ export default function BriefingChat({
   // --- NEW: handle supplier search
   const handleSupplierSearch = async (choice) => {
     setShowSupplierPrompt(false);
-    if (choice !== "yes") return;
     if (!lastCollectedInfo) return;
     setSearchingSuppliers(true);
     try {
-      appendMessage({ role: "AI", content: "🔎 Searching for potential suppliers..." });
+      if (choice === "yes") {
+        appendMessage({ role: "AI", content: "🔎 Searching for potential suppliers..." });
 
-      // NOTE: use conversation base route 
-      const res = await fetch(`${API_URL}/search-suppliers`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ collectedInfo: lastCollectedInfo }),
-      });
-
-      const payload = await res.json();
-      setSearchingSuppliers(false);
-
-      if (!res.ok) {
-        const errorMsg = payload.error || `Error ${res.status}`;
-        throw new Error(errorMsg);
-      }
-
-      // Show found suppliers
-      const suppliers = payload.suppliers || [];
-      if (suppliers.length === 0) {
-        appendMessage({
-          role: "AI",
-          content: "No suppliers found matching your criteria.",
+        const res = await fetch(`${API_URL}/search-suppliers`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ collectedInfo: lastCollectedInfo }),
         });
+
+        const payload = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(payload.error || `Error ${res.status}`);
+        }
+
+        const suggestions = payload.suggested_suppliers || payload.suppliers || [];
+        const queries = payload.queries || [];
+        const parts = [];
+        if (suggestions.length) parts.push("AI suggested suppliers: " + suggestions.join(", "));
+        if (queries.length) parts.push("Search queries: " + queries.join(" | "));
+        appendMessage({ role: "AI", content: parts.join("\n\n") || "No supplier suggestions returned." });
       } else {
-        let suppliersMsg = "I found some suppliers that match your request:\n\n";
-        suppliers.forEach((supplier, index) => {
-          suppliersMsg += `${index + 1}. ${supplier.name} - ${supplier.contact}\n`;
-        });
-        suppliersMsg += "\nWould you like to contact any of these suppliers?";
-        appendMessage({
-          role: "AI",
-          content: suppliersMsg,
-        });
+        appendMessage({ role: "AI", content: "Okay — I will not search for suppliers right now." });
       }
     } catch (error) {
       console.error("Supplier search error:", error);
@@ -368,7 +358,9 @@ export default function BriefingChat({
         role: "AI",
         content: `❌ Failed to search suppliers: ${error.message}`,
       });
+    } finally {
       setSearchingSuppliers(false);
+      setLastCollectedInfo(null);
     }
   };
 
