@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient.js";
 import BriefingChat from "../components/BriefingChat.js";
-import SupplierSearchPanel from "../components/SupplierSearchPanel.js";
 import ComparisonDashboard from "../components/ComparisonDashboard.js";
 import QuoteAnalysis from "../components/QuoteAnalysis.js";
 import BriefingInbox from "../components/BriefingInbox.js";
@@ -157,9 +156,6 @@ export default function BriefingPage() {
           <div className="flex flex-col lg:flex-row gap-6">
             <div className="flex-1 min-w-0">
               <BriefingChat briefingId={briefing?.id} />
-            </div>
-            <div className="w-full lg:w-96 sticky top-24 self-start">
-              <SupplierSearchPanel />
             </div>
           </div>
         )}
