@@ -596,9 +596,9 @@ export default function BriefingChat({
         ref={chatContainerRef}
         className="mb-4 h-64 sm:h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded p-4 bg-gray-50 dark:bg-gray-900"
       >
-        {messages.map((msg, idx) => (
-          // Skip rendering SupplierResults messages (they're just for persistence)
-          msg.role === "SupplierResults" ? null : (
+        {messages
+          .filter((msg) => msg.role !== "SupplierResults") // Remove SupplierResults from visible messages
+          .map((msg, idx) => (
           <div
             key={idx}
             className={`my-2 p-3 rounded-lg ${
@@ -626,8 +626,7 @@ export default function BriefingChat({
               )}
             </div>
           </div>
-          )
-        ))}
+          ))}
 
         {/* Render supplier results as small cards with "Apply to Email" action */}
         {supplierResults && supplierResults.length > 0 && (
