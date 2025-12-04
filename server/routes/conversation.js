@@ -1,4 +1,5 @@
 import express from "express";
+// Note: Node 18+ has native fetch. If on older Node, uncomment: import fetch from "node-fetch";
 
 export default function makeConversationRouter({
   ai,
@@ -9,15 +10,6 @@ export default function makeConversationRouter({
   supabase,
 }) {
   const router = express.Router();
-
-  // for live web search tool
-  const groundingTool = {
-    googleSearch:{}
-  }
-
-  const config = {
-    tools: [groundingTool],
-  };
 
   router.post("/start", async (req, res) => {
     const { description, briefingId } = req.body;
@@ -297,79 +289,7 @@ Make it formal, clear, and ready to send to suppliers.
     }
   });
 
-  router.post("/compose-email", async (req, res) => {
-    const { briefingId, collectedInfo } = req.body;
-
-    if (!collectedInfo)
-      return res.status(400).json({ error: "Collected info is required" });
-
-    try {
-      console.log("📧 Composing email for briefing:", briefingId);
-
-      const conversationHistory = collectedInfo.conversationHistory
-        .map(
-          (msg) =>
-            `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
-        )
-        .join("\n");
-
-      const response = await retryWithBackoff(
-        async () => {
-          return await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `
-Create a professional RFQ (Request for Quote) email based on this conversation:
-
-INITIAL REQUEST: ${collectedInfo.description}
-
-CONVERSATION:
-${conversationHistory}
-
-Generate a complete, professional email that includes:
-1. A clear subject line (format: "Subject: ...")
-2. Professional greeting
-3. Brief introduction
-4. Detailed requirements extracted from the conversation
-5. Specific questions or clarifications needed
-6. Request for quote with timeline
-7. Professional closing with signature placeholder
-
-Make it formal, clear, and ready to send to suppliers.
-`,
-          });
-        },
-        4,
-        2000
-      );
-
-      let email = response.text.trim();
-      email = email.replace(/``````/g, "");
-
-      const footerNotice =
-        "\n\n---\nThis email was AI-generated using Quotely: https://quotely-repo.vercel.app";
-      if (!email.includes(footerNotice)) email = `${email}${footerNotice}`;
-
-      console.log("✅ Email generated successfully (footer appended)");
-
-      res.json({
-        email,
-        message: "Email ready! You can copy and send it to suppliers.",
-      });
-    } catch (error) {
-      console.error("❌ Error generating email:", error);
-      res
-        .status(500)
-        .json({
-          error:
-            error.status === 503
-              ? "AI service is temporarily overloaded. Please wait a moment and try again."
-              : "Failed to generate email",
-          details: error.message,
-        });
-    }
-  });
-
-  // NEW: Search suppliers (AI-only suggestions; return structured supplier objects)
+  // Search suppliers
   router.post("/search-suppliers", async (req, res) => {
     const { collectedInfo, location } = req.body;
     if (!collectedInfo || !collectedInfo.description) {
@@ -377,91 +297,152 @@ Make it formal, clear, and ready to send to suppliers.
     }
 
     try {
-      const locationNote = location ? ` near "${location}"` : "";
-      const prompt = `
-You are an assistant that finds suppliers for a buyer's RFQ.
+      // 1. Configure SearXNG URL (Default to a public instance if not set)
+      // Recommended: Host your own or use a reliable one from https://searx.space/
+      const SEARXNG_URL = process.env.SEARXNG_API_URL || "https://searx.be/search";
+      
+      // 2. Construct Query
+      // We explicitly ask for "@" to find email patterns in snippets
+      const searchQuery = `${collectedInfo.description} ${location || ""} "@" OR "email" -site:pinterest.* -site:instagram.*`;
+      
+      console.log(`🔍 Searching SearXNG: ${searchQuery} via ${SEARXNG_URL}`);
 
+      const params = new URLSearchParams({
+        q: searchQuery,
+        format: "json",
+        language: "en",
+        categories: "general", 
+      });
+
+      // 3. Fetch Results
+      const searchRes = await fetch(`${SEARXNG_URL}?${params.toString()}`);
+      
+      if (!searchRes.ok) {
+        throw new Error(`SearXNG request failed: ${searchRes.status}`);
+      }
+
+      const searchData = await searchRes.json();
+      const results = searchData.results || [];
+
+      if (results.length === 0) {
+        console.log("ℹ️ SearXNG returned no results.");
+        return res.json({ suppliers: [], queries: [] });
+      }
+
+      // 4. Prepare Context for AI (RAG)
+      // We feed the top 15 snippets to Gemini to extract structured data
+      const searchContext = results.slice(0, 15).map((r, i) => `
+Result ${i + 1}:
+Title: ${r.title}
+URL: ${r.url}
+Snippet: ${r.content}
+`).join("\n---\n");
+
+      const prompt = `
+You are a procurement assistant.
 BRIEF: ${collectedInfo.description}
 LOCATION: ${location || "unspecified"}
 
-Task:
-1) Return JSON ONLY with a key "suppliers" that is an array (up to 7) of supplier objects.
-Each supplier object must include these keys: "name", "contact_email" (if known or null), "phone" (if known or null), "website" (if known or null), "note" (one-line about relevance/why recommended).
-2) Also include "queries": an array of short search queries (3-6 words) useful to find more suppliers.
+I have performed a web search. Here are the results:
 
-Example output:
+${searchContext}
+
+YOUR TASK:
+1. Analyze the search results above.
+2. Identify real suppliers relevant to the brief.
+3. Extract their Name, Website, and specifically a Contact Email.
+4. CRITICAL: Only include suppliers if you find a valid email address (e.g. info@domain.com) in the snippet.
+5. If a snippet does not contain an email, ignore it.
+
+Return a JSON object:
 {
   "suppliers": [
-    {"name":"Acme Supplies","contact_email":"sales@acme.com","phone":"+1 555 1111","website":"https://acme.com","note":"Specializes in ..."}
+    {
+      "name": "Supplier Name",
+      "contact_email": "email@example.com",
+      "phone": "Phone (or null)",
+      "website": "URL",
+      "note": "Why this supplier is relevant"
+    }
   ],
-  "queries":["stainless fastener supplier","hex head fastener manufacturer"]
+  "queries": ["suggested follow-up search query"]
 }
-
-Return only valid JSON. Prefer local/specialist suppliers if a location is provided. Do NOT include extraneous text.
 `;
 
+      // 5. Call AI (No tools needed, just context)
       const aiResp = await retryWithBackoff(() =>
         ai.models.generateContent({
           model: "gemini-2.5-flash",
           contents: prompt,
-          config,
         })
       );
 
-      const aiText = (aiResp && (aiResp.text || aiResp.outputText)) ? (aiResp.text || aiResp.outputText).trim() : "";
-      let parsed = { suppliers: [], queries: [] };
+      const raw = (aiResp.text || "").trim();
 
-      // Try strict JSON parse first
-      try {
-        const start = aiText.indexOf("{");
-        parsed = start !== -1 ? JSON.parse(aiText.slice(start)) : JSON.parse(aiText);
-      } catch (err) {
-        // Fallback parsing: extract supplier-like lines
-        const lines = aiText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-        const suppliers = [];
-        const queries = [];
-        for (const line of lines) {
-          // simple supplier line heuristics
-          const domainMatch = line.match(/([a-z0-9.-]+\.[a-z]{2,6})/i);
-          const emailMatch = line.match(/([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i);
-          const phoneMatch = line.match(/(\+?\d[\d\-\s()]{6,}\d)/);
-          if (/supplier|inc|ltd|company|co\./i.test(line) && suppliers.length < 7) {
-            // create best-effort object
-            suppliers.push({
-              name: line.replace(/^[\-\d.\s]*/,'').slice(0,120),
-              contact_email: emailMatch ? emailMatch[1] : null,
-              phone: phoneMatch ? phoneMatch[1].trim() : null,
-              website: domainMatch ? domainMatch[1] : null,
-              note: "",
-            });
-          } else {
-            // treat as possible query if short
-            const wc = line.split(/\s+/).length;
-            if (wc >= 2 && wc <= 6 && queries.length < 10) queries.push(line.replace(/["'.]$/,''));
-          }
+      // 6. Parse JSON (Reuse your existing robust parsing logic)
+      const tryExtractJson = (text) => {
+        const jsonStart = text.indexOf("{");
+        const jsonEnd = text.lastIndexOf("}") + 1;
+        if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+          return text.substring(jsonStart, jsonEnd);
         }
-        parsed.suppliers = suppliers;
-        parsed.queries = queries;
+        return null;
+      };
+
+      let suppliers = [];
+      let queries = [];
+
+      const maybeJson = tryExtractJson(raw);
+      if (maybeJson) {
+        try {
+          const parsed = JSON.parse(maybeJson);
+          if (Array.isArray(parsed.suppliers)) {
+            suppliers = parsed.suppliers.map((s) => ({
+              name: s.name || s.title || null,
+              contact_email: s.contact_email || s.email || null,
+              phone: s.phone || null,
+              website: s.website || null,
+              note: s.note || null,
+            }));
+          }
+          if (Array.isArray(parsed.queries)) queries = parsed.queries;
+        } catch (e) {}
       }
 
-      // Normalize suppliers (ensure expected keys)
-      parsed.suppliers = (parsed.suppliers || []).slice(0,7).map((s) => ({
-        name: s.name || s.title || null,
-        contact_email: s.contact_email || s.email || null,
-        phone: s.phone || s.tel || null,
-        website: s.website || s.url || null,
-        note: s.note || "",
-      }));
+      // 7. Fallback Regex Extraction (if AI failed to format JSON)
+      if (!suppliers.length) {
+        // Fixed typo in regex: A-ZaZ -> A-Za-z
+        const emailRegex = /([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
+        const emails = [...new Set(raw.match(emailRegex) || [])];
+        suppliers = emails.slice(0, 7).map(e => ({
+            name: "Supplier (from search)",
+            contact_email: e,
+            phone: null,
+            website: null,
+            note: "Extracted from search results"
+        }));
+      }
 
-      res.json({
-        suppliers: parsed.suppliers,
-        queries: parsed.queries || [],
-        raw_text: aiText || null,
-        note: "AI supplier suggestions (location-aware)",
-      });
-    } catch (err) {
-      console.error("Error in /search-suppliers:", err);
-      res.status(500).json({ error: "Failed to search suppliers", details: err.message || String(err) });
+      // 8. Final Filter
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      suppliers = suppliers
+        .map((s) => ({
+          ...s,
+          contact_email: s.contact_email && emailRegex.test(s.contact_email) ? s.contact_email : null,
+        }))
+        .filter((s) => s.contact_email) // Only return suppliers with emails
+        .slice(0, 7);
+
+      if (!suppliers.length) {
+        console.log("ℹ️ No suppliers with valid emails found in search snippets.");
+        return res.json({ suppliers: [], queries: queries || [] });
+      }
+
+      return res.json({ suppliers, queries });
+
+    } catch (error) {
+      console.error("❌ Error searching suppliers:", error);
+      return res.status(500).json({ error: "Failed to search suppliers", details: error.message });
     }
   });
 

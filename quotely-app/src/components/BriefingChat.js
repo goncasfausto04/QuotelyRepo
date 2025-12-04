@@ -1,7 +1,6 @@
 // BriefingChat.js
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../supabaseClient.js";
-// import BriefingEmailComposer from "./BriefingEmailComposer.js";
 
 export default function BriefingChat({
   briefingId: initialBriefingId,
@@ -76,6 +75,20 @@ export default function BriefingChat({
             // mark that an email exists without marking the conversation as "over"
             setEmailGenerated(true);
             console.log("✅ Loaded briefing with generated email");
+          }
+
+          // ✅ RESTORE: Load supplier results from chat messages
+          const supplierMessages = data.chat.filter((msg) => msg.role === "SupplierResults");
+          if (supplierMessages.length > 0) {
+            // Use the most recent supplier results
+            const latestSuppliers = supplierMessages[supplierMessages.length - 1];
+            try {
+              const suppliers = JSON.parse(latestSuppliers.content);
+              setSupplierResults(suppliers);
+              console.log("✅ Restored supplier results from chat");
+            } catch (e) {
+              console.warn("Failed to parse saved supplier results:", e);
+            }
           }
         }
         setBriefingId(initialBriefingId);
@@ -318,12 +331,7 @@ export default function BriefingChat({
         // mark that an email has been generated (conversation remains open)
         setEmailGenerated(true);
         setLastCollectedInfo(data.collectedInfo);
-        // Ask supplier question inside the chat (users reply in-chat)
-        appendMessage({
-          role: "AI",
-          content:
-            "Would you like me to search for potential suppliers that match this request? Reply with 'yes' or 'no'.",
-        });
+        // Show the supplier choice buttons (no chat message needed)
         setAwaitingSupplierChoice(true);
       }
       // CASE 2B: Ask next question
@@ -540,59 +548,37 @@ export default function BriefingChat({
       if (!res.ok) throw new Error(payload.error || `Status ${res.status}`);
 
       const suppliers = payload.suppliers || [];
-      const queries = payload.queries || [];
-
-      // parse queries into usable entries for send boxes
-      const parseQueryItem = (q) => {
-        if (!q) return { name: null, contact_email: null, phone: null, website: null, note: null };
-        if (typeof q === "object") {
-          return {
-            name: q.name || q.title || null,
-            contact_email: q.contact_email || q.email || null,
-            phone: q.phone || null,
-            website: q.website || null,
-            note: q.note || null,
-          };
-        }
-        // q is a string — try to extract email, name, phone, website
-        const emailMatch = q.match(/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/);
-        const nameMatch = q.match(/name["']?\s*[:=]\s*["']?([^"|,]+)/i) || q.match(/"name":\s*"([^"]+)"/i);
-        const websiteMatch = q.match(/https?:\/\/[^\s,|"]+/i);
-        const phoneMatch = q.match(/(\+\d[\d\s-]{6,}|\d{7,})/);
-        return {
-          name: nameMatch ? nameMatch[1].trim() : null,
-          contact_email: emailMatch ? emailMatch[1].trim() : null,
-          phone: phoneMatch ? phoneMatch[1].trim() : null,
-          website: websiteMatch ? websiteMatch[0] : null,
-          note: q,
-        };
-      };
-
-      const parsedQueries = (queries || [])
-        .map(parseQueryItem)
-        // keep only entries that have at least one useful value
-        .filter((q) => q.name || q.contact_email || q.phone || q.website);
-
-      // populate supplierResults from parsed queries (this drives the UI send boxes)
-      setSupplierResults(parsedQueries);
-
-      // DO NOT append the queries text into the chat — only show the boxes
-      // (supplierResults contains the parsed query entries)
-      if (typeof onSuppliersFound === "function") {
-        try {
-          onSuppliersFound({ suppliers, queries, collectedInfo: lastCollectedInfo });
-        } catch (e) {
-          console.warn("onSuppliersFound handler error:", e);
-        }
+      if (suppliers.length === 0) {
+        appendMessage({ role: "AI", content: "❌ No suppliers found matching your request." });
+        // Keep the search again option available even if no results
+        setAwaitingSupplierChoice(true);
+      } else {
+        appendMessage({ role: "AI", content: `✅ Found ${suppliers.length} potential suppliers:` });
+        setSupplierResults(suppliers);
+        
+        // ✅ PERSIST: Save supplier results to chat so they survive page reloads
+        appendMessage({
+          role: "SupplierResults",
+          content: JSON.stringify(suppliers),
+          // This message won't be visible in the UI - it's just for persistence
+        });
+        
+        if (onSuppliersFound) onSuppliersFound(suppliers);
       }
     } catch (err) {
       console.error("Supplier search failed:", err);
-      appendMessage({ role: "AI", content: `❌ Supplier search failed: ${err.message || String(err)}` });
+      appendMessage({
+        role: "AI",
+        content: `❌ Supplier search failed: ${err.message || String(err)}`,
+      });
+      // Keep the search again option available even on error
+      setAwaitingSupplierChoice(true);
     } finally {
       setSearchingSuppliers(false);
       setAskingLocation(false);
-      setAwaitingSupplierChoice(false);
-      setLastCollectedInfo(null);
+      // Don't reset these - allow "Search Again" to work
+      // setAwaitingSupplierChoice(false); 
+      // setLastCollectedInfo(null);
     }
   };
 
@@ -611,6 +597,8 @@ export default function BriefingChat({
         className="mb-4 h-64 sm:h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded p-4 bg-gray-50 dark:bg-gray-900"
       >
         {messages.map((msg, idx) => (
+          // Skip rendering SupplierResults messages (they're just for persistence)
+          msg.role === "SupplierResults" ? null : (
           <div
             key={idx}
             className={`my-2 p-3 rounded-lg ${
@@ -638,48 +626,48 @@ export default function BriefingChat({
               )}
             </div>
           </div>
+          )
         ))}
 
         {/* Render supplier results as small cards with "Apply to Email" action */}
         {supplierResults && supplierResults.length > 0 && (
           <div className="mt-4 flex flex-col gap-3">
+            {/* Search Again button at the top of supplier results */}
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Found {supplierResults.length} supplier{supplierResults.length !== 1 ? 's' : ''}:
+              </span>
+              <button
+                onClick={() => {
+                  // Clear current results and restart supplier search flow
+                  setSupplierResults([]);
+                  setAwaitingSupplierChoice(true);
+                  setLastCollectedInfo(lastCollectedInfo || { 
+                    description: messages.find(m => m.role === "User")?.content || "",
+                    conversationHistory: []
+                  });
+                }}
+                disabled={searchingSuppliers || awaitingSupplierChoice}
+                className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Search for different suppliers"
+              >
+                🔍 Search Again
+              </button>
+            </div>
+
             {supplierResults.map((s, i) => {
               return (
                 <div
                   key={i}
                   className="w-full p-3 rounded-lg border bg-white dark:bg-gray-800 dark:border-gray-700"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="font-medium text-sm text-gray-900 dark:text-white break-words">
                         {s.name || "Unnamed"}
                       </div>
-                      <div className="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-1">
-                        {/* render only non-null contact fields */}
-                        {s.contact_email && (
-                          <div>
-                            <strong className="text-xs text-gray-500">Email:</strong>{" "}
-                            <span className="break-words">{s.contact_email}</span>
-                          </div>
-                        )}
-                        {s.phone && (
-                          <div>
-                            <strong className="text-xs text-gray-500">Phone:</strong>{" "}
-                            <span className="break-words">{s.phone}</span>
-                          </div>
-                        )}
-                        {s.website && (
-                          <div>
-                            <strong className="text-xs text-gray-500">Website:</strong>{" "}
-                            <span className="break-words">{s.website}</span>
-                          </div>
-                        )}
-                        {s.note && (
-                          <div>
-                            <strong className="text-xs text-gray-500">Note:</strong>{" "}
-                            <span className="break-words">{s.note}</span>
-                          </div>
-                        )}
+                      <div className="text-xs text-gray-500 dark:text-gray-400 break-words">
+                        {s.contact_email}
                       </div>
                     </div>
 
@@ -688,7 +676,7 @@ export default function BriefingChat({
                         onClick={() => sendGeneratedEmailToQuotely(s)}
                         className="px-3 py-1 rounded bg-green-600 text-white text-sm hover:bg-green-700"
                         disabled={applyingSupplier !== null}
-                        title="Send generated email to quotelybriefings@gmail.com with this supplier context"
+                        title="Send generated email to quotelybriefings@gmail.com"
                       >
                         {applyingSupplier === (s.contact_email || s.name) ? "Sending..." : "Send"}
                       </button>
@@ -719,6 +707,31 @@ export default function BriefingChat({
             </div>
           </div>
         )}
+
+        {/* YES/NO buttons for supplier search prompt */}
+        {awaitingSupplierChoice && (
+          <div className="my-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700">
+            <p className="text-blue-900 dark:text-blue-100 mb-3 font-medium">
+              Would you like me to search for potential suppliers that match this request?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleSupplierSearch("yes")}
+                disabled={searchingSuppliers}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                Yes, find suppliers
+              </button>
+              <button
+                onClick={() => handleSupplierSearch("no")}
+                disabled={searchingSuppliers}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                No, thanks
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">
@@ -733,21 +746,25 @@ export default function BriefingChat({
               ? "Please wait..."
               : !isConversationStarted
               ? "e.g., I need 100 custom t-shirts with my logo"
+              : awaitingSupplierChoice
+              ? "Use the buttons above to choose supplier search"
+              : askingLocation
+              ? "Enter location for supplier search..."
               : emailGenerated
-              ? "Email generated — reply 'yes' or 'no' for supplier search, or continue the conversation"
+              ? "Email generated! You can continue the conversation or start a new request"
               : "Type your answer..."
           }
-          // only disable while loading (allow free chat after email generated)
-          disabled={isLoading}
+          // disable while loading or waiting for button choice
+          disabled={isLoading || awaitingSupplierChoice}
         />
         <button
           className={`w-full sm:w-auto px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors ${
-            isLoading || !input.trim()
+            isLoading || !input.trim() || awaitingSupplierChoice
               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
               : "bg-blue-600 text-white hover:bg-blue-700"
            }`}
            onClick={sendMessage}
-           disabled={isLoading || !input.trim()}
+           disabled={isLoading || !input.trim() || awaitingSupplierChoice}
          >
            {isLoading ? "..." : "Send"}
          </button>
