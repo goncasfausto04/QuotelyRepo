@@ -19,6 +19,8 @@ export default function makeConversationRouter({
     tools: [groundingTool],
   };
 
+  // Start new conversation
+
   router.post("/start", async (req, res) => {
     const { description, briefingId } = req.body;
 
@@ -78,6 +80,8 @@ RETURN ONLY THE QUESTION AS PLAIN TEXT (no JSON, no formatting).
       });
     }
   });
+
+  // Get next question based on user answer
 
   router.post("/next-question", async (req, res) => {
     const { briefingId, userAnswer } = req.body;
@@ -225,77 +229,7 @@ RETURN: Either ONE question as plain text, OR the word "COMPLETE" (no quotes, no
     }
   });
 
-  router.post("/compose-email", async (req, res) => {
-    const { briefingId, collectedInfo } = req.body;
-
-    if (!collectedInfo)
-      return res.status(400).json({ error: "Collected info is required" });
-
-    try {
-      console.log("📧 Composing email for briefing:", briefingId);
-
-      const conversationHistory = collectedInfo.conversationHistory
-        .map(
-          (msg) =>
-            `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
-        )
-        .join("\n");
-
-      const response = await retryWithBackoff(
-        async () => {
-          return await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `
-Create a professional RFQ (Request for Quote) email based on this conversation:
-
-INITIAL REQUEST: ${collectedInfo.description}
-
-CONVERSATION:
-${conversationHistory}
-
-Generate a complete, professional email that includes:
-1. A clear subject line (format: "Subject: ...")
-2. Professional greeting
-3. Brief introduction
-4. Detailed requirements extracted from the conversation
-5. Specific questions or clarifications needed
-6. Request for quote with timeline
-7. Professional closing with signature placeholder
-
-Make it formal, clear, and ready to send to suppliers.
-`,
-          });
-        },
-        4,
-        2000
-      );
-
-      let email = response.text.trim();
-      email = email.replace(/``````/g, "");
-
-      const footerNotice =
-        "\n\n---\nThis email was AI-generated using Quotely: https://quotely-repo.vercel.app";
-      if (!email.includes(footerNotice)) email = `${email}${footerNotice}`;
-
-      console.log("✅ Email generated successfully (footer appended)");
-
-      res.json({
-        email,
-        message: "Email ready! You can copy and send it to suppliers.",
-      });
-    } catch (error) {
-      console.error("❌ Error generating email:", error);
-      res
-        .status(500)
-        .json({
-          error:
-            error.status === 503
-              ? "AI service is temporarily overloaded. Please wait a moment and try again."
-              : "Failed to generate email",
-          details: error.message,
-        });
-    }
-  });
+  // Compose email based on collected info
 
   router.post("/compose-email", async (req, res) => {
     const { briefingId, collectedInfo } = req.body;
@@ -306,6 +240,27 @@ Make it formal, clear, and ready to send to suppliers.
     try {
       console.log("📧 Composing email for briefing:", briefingId);
 
+      // Fetch briefing to get user_auth_id
+      const { data: briefing, error: briefingError } = await supabase
+        .from("briefings")
+        .select("user_auth_id")
+        .eq("id", briefingId)
+        .single();
+
+      if (briefingError || !briefing) {
+        return res.status(404).json({ error: "Briefing not found" });
+      }
+
+      // Fetch user profile using auth_id
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("name")
+        .eq("auth_id", briefing.user_auth_id)
+        .single();
+
+      const userName = user?.name || "Customer"; // Fallback if no name
+      console.log("👤 User name for email:", userName);
+
       const conversationHistory = collectedInfo.conversationHistory
         .map(
           (msg) =>
@@ -313,41 +268,38 @@ Make it formal, clear, and ready to send to suppliers.
         )
         .join("\n");
 
-      const response = await retryWithBackoff(
-        async () => {
-          return await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `
+      const response = await retryWithBackoff(async () => {
+        return await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: `
 Create a professional RFQ (Request for Quote) email based on this conversation:
 
+USER NAME: ${userName}
 INITIAL REQUEST: ${collectedInfo.description}
 
 CONVERSATION:
 ${conversationHistory}
 
 Generate a complete, professional email that includes:
-1. A clear subject line (format: "Subject: ...")
-2. Professional greeting
-3. Brief introduction
+1. A clear subject line (format: "Subject: ...") 
+2. Professional greeting using "${userName}" naturally
+3. Brief introduction mentioning "${userName}" from [Your Company]
 4. Detailed requirements extracted from the conversation
 5. Specific questions or clarifications needed
 6. Request for quote with timeline
-7. Professional closing with signature placeholder
+7. Professional closing with signature using "${userName}"
 
 Make it formal, clear, and ready to send to suppliers.
 `,
-          });
-        },
-        4,
-        2000
-      );
+        });
+      });
 
       let email = response.text.trim();
       email = email.replace(/``````/g, "");
 
       const footerNotice =
         "\n\n---\nThis email was AI-generated using Quotely: https://quotely-repo.vercel.app";
-      if (!email.includes(footerNotice)) email = `${email}${footerNotice}`;
+      if (!email.includes(footerNotice)) email += footerNotice;
 
       console.log("✅ Email generated successfully (footer appended)");
 
@@ -357,19 +309,19 @@ Make it formal, clear, and ready to send to suppliers.
       });
     } catch (error) {
       console.error("❌ Error generating email:", error);
-      res
-        .status(500)
-        .json({
-          error:
-            error.status === 503
-              ? "AI service is temporarily overloaded. Please wait a moment and try again."
-              : "Failed to generate email",
-          details: error.message,
-        });
+      res.status(500).json({
+        error:
+          error.status === 503
+            ? "AI service is temporarily overloaded. Please wait a moment and try again."
+            : "Failed to generate email",
+        details: error.message,
+      });
     }
   });
 
-  // NEW: Search suppliers (AI-only suggestions; return structured supplier objects)
+
+  // Search for suppliers based on collected info
+
   router.post("/search-suppliers", async (req, res) => {
     const { collectedInfo, location } = req.body;
     if (!collectedInfo || !collectedInfo.description) {
