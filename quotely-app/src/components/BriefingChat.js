@@ -5,6 +5,7 @@ import { supabase } from "../supabaseClient.js";
 export default function BriefingChat({
   briefingId: initialBriefingId,
   onSuppliersFound,
+  onEmailGenerated,
 }) {
   const [briefingId, setBriefingId] = useState(initialBriefingId || null);
   const API_URL = process.env.REACT_APP_API_URL;

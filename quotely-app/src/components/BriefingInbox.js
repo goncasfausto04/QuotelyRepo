@@ -24,6 +24,7 @@ export default function BriefingInbox({ briefingId }) {
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
+  const [generatedEmail, setGeneratedEmail] = useState("");
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
 
@@ -276,6 +277,35 @@ export default function BriefingInbox({ briefingId }) {
     }
   };
 
+  // Load generated email from chat messages
+  const loadGeneratedEmail = useCallback(async () => {
+    if (!briefingId) return;
+    try {
+      const { data, error } = await supabase
+        .from("briefings")
+        .select("chat")
+        .eq("id", briefingId)
+        .single();
+      
+      if (!error && data?.chat) {
+        // Find the last email message in chat
+        const emailMessage = [...data.chat]
+          .reverse()
+          .find(msg => msg.role === "Email" && msg.isEmail);
+        
+        if (emailMessage?.content) {
+          setGeneratedEmail(emailMessage.content);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load generated email:", err);
+    }
+  }, [briefingId]);
+
+  useEffect(() => {
+    loadGeneratedEmail();
+  }, [loadGeneratedEmail]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -500,7 +530,7 @@ export default function BriefingInbox({ briefingId }) {
       <div className="mt-6">
         <BriefingEmailComposer
           briefingId={briefingId}
-          // Not providing getGeneratedEmail here - composer still supports custom text.
+          getGeneratedEmail={() => generatedEmail}
           onSent={handleComposerSent}
         />
       </div>
