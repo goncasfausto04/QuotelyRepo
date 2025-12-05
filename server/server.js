@@ -5,6 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import { randomBytes } from "crypto";
+import { LinkupClient } from 'linkup-sdk';
 
 // Import route handlers
 import makeEmailRouter from "./routes/email.js";
@@ -145,6 +146,80 @@ const ai = new GoogleGenAI({
 });
 console.log("✅ Google AI client initialized");
 
+// --- add Brave Search client ---
+const braveClient = {
+  apiKey: process.env.BRAVE_API_KEY || "",
+  
+  async search(query, opts = {}) {
+    if (!this.apiKey) {
+      throw new Error("BRAVE_API_KEY not set in environment variables");
+    }
+    
+    // Brave API correct parameters - note the parameter names are different
+    const params = new URLSearchParams({ 
+      q: query,
+      count: String(opts.size || 20),
+      search_lang: "en",
+      country: "us",  // lowercase
+      safesearch: "moderate",
+      freshness: "pm"
+    });
+    
+    const url = `https://api.search.brave.com/res/v1/web/search?${params.toString()}`;
+    
+    console.log(`🦁 Calling Brave API: ${query.substring(0, 50)}...`);
+    
+    const res = await fetch(url, {
+      headers: { 
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip",
+        "X-Subscription-Token": this.apiKey,
+      },
+    });
+    
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      console.error(`❌ Brave API error details:`, txt);
+      throw new Error(`Brave search failed: ${res.status} ${res.statusText} ${txt.slice(0, 200)}`);
+    }
+    
+    const data = await res.json();
+    console.log(`📊 Brave raw response keys:`, Object.keys(data));
+    
+    // Brave API structure varies - check for different possible structures
+    let items = [];
+    if (data.web && data.web.results) {
+      items = data.web.results;
+      console.log(`✅ Found results in data.web.results: ${items.length} items`);
+    } else if (data.results) {
+      items = data.results;
+      console.log(`✅ Found results in data.results: ${items.length} items`);
+    } else if (data.query && data.query.web && data.query.web.results) {
+      items = data.query.web.results;
+      console.log(`✅ Found results in data.query.web.results: ${items.length} items`);
+    } else {
+      console.log(`⚠️ No results found in expected Brave API structure`);
+      // Try to find any array in the response
+      for (const key in data) {
+        if (Array.isArray(data[key])) {
+          items = data[key];
+          console.log(`🔍 Found array in data.${key}: ${items.length} items`);
+          break;
+        }
+      }
+    }
+    
+    return items.map(item => ({
+      title: item.title || "",
+      url: item.url || item.link || "",
+      content: item.description || item.snippet || item.content || "",
+    }));
+  }
+};
+
+console.log("✅ Brave client initialized (requires BRAVE_API_KEY env var)");
+// --- end add ---
+
 const analyzeRouter = makeAnalyzeRouter({
   ai,
   retryWithBackoff,
@@ -163,6 +238,7 @@ const conversationRouter = makeConversationRouter({
   loadConversationFromDb,
   conversations,
   supabase,
+  braveClient, // pass the Brave client into the router
 });
 app.use("/", conversationRouter);
 
