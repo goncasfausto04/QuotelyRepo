@@ -291,101 +291,97 @@ Make it formal, clear, and ready to send to suppliers.
 
   // Search suppliers (SearxNG)
   router.post("/search-suppliers", async (req, res) => {
-    const { description, collectedInfo, location } = req.body || {};
-
-    // Build base description
-    let searchDescription = description || collectedInfo?.description;
-    if (!searchDescription && collectedInfo?.conversationHistory?.length) {
-      const firstUser = collectedInfo.conversationHistory.find((m) => m.role === "user");
-      searchDescription = firstUser?.content || collectedInfo.conversationHistory[0]?.content;
-    }
-    if (!searchDescription || !searchDescription.trim()) {
-      return res.status(400).json({ error: "Description is required" });
+    const { collectedInfo, location } = req.body;
+    if (!collectedInfo || !collectedInfo.description) {
+      return res.status(400).json({ error: "collectedInfo.description required" });
     }
 
-    const SEARXNG_URL = (process.env.SEARXNG_API_URL || "http://localhost:8080/search").replace(/\/+$/, "");
-
-    // Ask AI to generate a small set of targeted search queries
-    let queries = [];
     try {
-      const aiPrompt = `
-Given this RFQ description: "${searchDescription}"
-Location hint: "${location || "any"}"
+      const locationNote = location ? ` near "${location}"` : "";
+      const prompt = `
+You are an assistant that finds suppliers for a buyer's RFQ.
 
-Generate up to 5 concise search queries (one per line) that would help find suppliers, company pages, contact emails, or product listings related to this request.
-Return only the queries, one per line, no explanation.
+BRIEF: ${collectedInfo.description}
+LOCATION: ${location || "unspecified"}
+
+Task:
+1) Return JSON ONLY with a key "suppliers" that is an array (up to 7) of supplier objects.
+Each supplier object must include these keys: "name", "contact_email" (if known or null), "phone" (if known or null), "website" (if known or null), "note" (one-line about relevance/why recommended).
+2) Also include "queries": an array of short search queries (3-6 words) useful to find more suppliers.
+
+Example output:
+{
+  "suppliers": [
+    {"name":"Acme Supplies","contact_email":"sales@acme.com","phone":"+1 555 1111","website":"https://acme.com","note":"Specializes in ..."}
+  ],
+  "queries":["stainless fastener supplier","hex head fastener manufacturer"]
+}
+
+Return only valid JSON. Prefer local/specialist suppliers if a location is provided. Do NOT include extraneous text.
 `;
+
       const aiResp = await retryWithBackoff(() =>
         ai.models.generateContent({
           model: "gemini-2.5-flash",
-          contents: aiPrompt,
+          contents: prompt,
+          config,
         })
       );
-      const text = (aiResp?.text || "").trim();
-      queries = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean).slice(0, 5);
-      // sanitize queries
-      queries = queries.map((q) => q.replace(/[^\w\s@.-]/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
-    } catch (err) {
-      console.warn("⚠️ Failed to generate AI queries, falling back to single query:", err?.message || err);
-    }
 
-    // Fallback to single generic query if AI didn't produce anything useful
-    if (!queries.length) {
-      const locationPart = location ? `${location} ` : "";
-      const rawQuery = `${locationPart}${searchDescription} suppliers contact email`;
-      queries = [rawQuery.replace(/[^\w\s@.-]/g, " ").replace(/\s+/g, " ").trim().substring(0, 400)];
-    }
+      const aiText = (aiResp && (aiResp.text || aiResp.outputText)) ? (aiResp.text || aiResp.outputText).trim() : "";
+      let parsed = { suppliers: [], queries: [] };
 
-    // Run each query against SearxNG and aggregate results
-    const controller = new AbortController();
-    const timeoutMs = 20000;
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const allResults = [];
-      const seen = new Set();
-      for (const q of queries) {
-        const params = new URLSearchParams({
-          q,
-          format: "json",
-          language: "en",
-          categories: "general",
-        });
-        const resp = await fetch(`${SEARXNG_URL}?${params.toString()}`, {
-          signal: controller.signal,
-          headers: { "User-Agent": "Quotely/1.0" },
-        });
-        if (!resp.ok) {
-          console.warn(`SearxNG returned ${resp.status} for query "${q}"`);
-          continue;
+      // Try strict JSON parse first
+      try {
+        const start = aiText.indexOf("{");
+        parsed = start !== -1 ? JSON.parse(aiText.slice(start)) : JSON.parse(aiText);
+      } catch (err) {
+        // Fallback parsing: extract supplier-like lines
+        const lines = aiText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        const suppliers = [];
+        const queries = [];
+        for (const line of lines) {
+          // simple supplier line heuristics
+          const domainMatch = line.match(/([a-z0-9.-]+\.[a-z]{2,6})/i);
+          const emailMatch = line.match(/([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i);
+          const phoneMatch = line.match(/(\+?\d[\d\-\s()]{6,}\d)/);
+          if (/supplier|inc|ltd|company|co\./i.test(line) && suppliers.length < 7) {
+            // create best-effort object
+            suppliers.push({
+              name: line.replace(/^[\-\d.\s]*/,'').slice(0,120),
+              contact_email: emailMatch ? emailMatch[1] : null,
+              phone: phoneMatch ? phoneMatch[1].trim() : null,
+              website: domainMatch ? domainMatch[1] : null,
+              note: "",
+            });
+          } else {
+            // treat as possible query if short
+            const wc = line.split(/\s+/).length;
+            if (wc >= 2 && wc <= 6 && queries.length < 10) queries.push(line.replace(/["'.]$/,''));
+          }
         }
-        const data = await resp.json().catch(() => ({}));
-        const rawResults = data?.results || data?.response || [];
-        for (const it of rawResults) {
-          const url = it?.url || it?.link || it?.source || null;
-          if (!url) continue;
-          const key = url.toLowerCase();
-          if (seen.has(key)) continue;
-          seen.add(key);
-          allResults.push({
-            query: q,
-            title: it?.title || it?.headline || "",
-            url,
-            content: it?.content || it?.snippet || it?.excerpt || it?.description || "",
-          });
-          if (allResults.length >= 200) break;
-        }
-        if (allResults.length >= 200) break;
+        parsed.suppliers = suppliers;
+        parsed.queries = queries;
       }
-      clearTimeout(timeoutId);
-      console.log(`✅ Aggregated ${allResults.length} supplier hits from ${queries.length} queries`);
-      return res.json({ suppliers: allResults.slice(0, 200), queries });
+
+      // Normalize suppliers (ensure expected keys)
+      parsed.suppliers = (parsed.suppliers || []).slice(0,7).map((s) => ({
+        name: s.name || s.title || null,
+        contact_email: s.contact_email || s.email || null,
+        phone: s.phone || s.tel || null,
+        website: s.website || s.url || null,
+        note: s.note || "",
+      }));
+
+      res.json({
+        suppliers: parsed.suppliers,
+        queries: parsed.queries || [],
+        raw_text: aiText || null,
+        note: "AI supplier suggestions (location-aware)",
+      });
     } catch (err) {
-      clearTimeout(timeoutId);
-      console.error("❌ Error searching SearxNG for queries:", err?.message || err);
-      if (err.name === "AbortError") {
-        return res.status(504).json({ error: "Search request timed out" });
-      }
-      return res.status(500).json({ error: "Supplier search failed", details: err?.message || String(err) });
+      console.error("Error in /search-suppliers:", err);
+      res.status(500).json({ error: "Failed to search suppliers", details: err.message || String(err) });
     }
   });
   
