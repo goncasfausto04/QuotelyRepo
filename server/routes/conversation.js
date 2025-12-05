@@ -293,64 +293,95 @@ Make it formal, clear, and ready to send to suppliers.
   router.post("/search-suppliers", async (req, res) => {
     const { description, collectedInfo, location } = req.body || {};
 
-    // Build description from multiple possible fields
+    // Build base description
     let searchDescription = description || collectedInfo?.description;
     if (!searchDescription && collectedInfo?.conversationHistory?.length) {
       const firstUser = collectedInfo.conversationHistory.find((m) => m.role === "user");
       searchDescription = firstUser?.content || collectedInfo.conversationHistory[0]?.content;
     }
-
     if (!searchDescription || !searchDescription.trim()) {
       return res.status(400).json({ error: "Description is required" });
     }
 
-    // Prepare SearxNG URL
     const SEARXNG_URL = (process.env.SEARXNG_API_URL || "http://localhost:8080/search").replace(/\/+$/, "");
 
-    // Build and sanitize query (Searx expects q param)
-    const locationPart = location ? `${location} ` : "";
-    const rawQuery = `${locationPart}${searchDescription} suppliers contact email`;
-    const searchQuery = rawQuery.replace(/[^\w\s@.-]/g, " ").replace(/\s+/g, " ").trim().substring(0, 400);
-
-    console.log(`🔍 Searching SearxNG: "${searchQuery}" via ${SEARXNG_URL}`);
-
-    // Fetch with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    // Ask AI to generate a small set of targeted search queries
+    let queries = [];
     try {
-      const params = new URLSearchParams({
-        q: searchQuery,
-        format: "json",
-        language: "en",
-        categories: "general",
-      });
+      const aiPrompt = `
+Given this RFQ description: "${searchDescription}"
+Location hint: "${location || "any"}"
 
-      const resp = await fetch(`${SEARXNG_URL}?${params.toString()}`, {
-        signal: controller.signal,
-        headers: { "User-Agent": "Quotely/1.0" },
-      });
-      clearTimeout(timeoutId);
+Generate up to 5 concise search queries (one per line) that would help find suppliers, company pages, contact emails, or product listings related to this request.
+Return only the queries, one per line, no explanation.
+`;
+      const aiResp = await retryWithBackoff(() =>
+        ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: aiPrompt,
+        })
+      );
+      const text = (aiResp?.text || "").trim();
+      queries = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean).slice(0, 5);
+      // sanitize queries
+      queries = queries.map((q) => q.replace(/[^\w\s@.-]/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+    } catch (err) {
+      console.warn("⚠️ Failed to generate AI queries, falling back to single query:", err?.message || err);
+    }
 
-      if (!resp.ok) {
-        const txt = await resp.text().catch(() => "");
-        console.error("❌ SearxNG returned non-ok:", resp.status, txt.slice(0, 200));
-        return res.status(502).json({ error: "Search backend error", details: txt });
+    // Fallback to single generic query if AI didn't produce anything useful
+    if (!queries.length) {
+      const locationPart = location ? `${location} ` : "";
+      const rawQuery = `${locationPart}${searchDescription} suppliers contact email`;
+      queries = [rawQuery.replace(/[^\w\s@.-]/g, " ").replace(/\s+/g, " ").trim().substring(0, 400)];
+    }
+
+    // Run each query against SearxNG and aggregate results
+    const controller = new AbortController();
+    const timeoutMs = 20000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const allResults = [];
+      const seen = new Set();
+      for (const q of queries) {
+        const params = new URLSearchParams({
+          q,
+          format: "json",
+          language: "en",
+          categories: "general",
+        });
+        const resp = await fetch(`${SEARXNG_URL}?${params.toString()}`, {
+          signal: controller.signal,
+          headers: { "User-Agent": "Quotely/1.0" },
+        });
+        if (!resp.ok) {
+          console.warn(`SearxNG returned ${resp.status} for query "${q}"`);
+          continue;
+        }
+        const data = await resp.json().catch(() => ({}));
+        const rawResults = data?.results || data?.response || [];
+        for (const it of rawResults) {
+          const url = it?.url || it?.link || it?.source || null;
+          if (!url) continue;
+          const key = url.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          allResults.push({
+            query: q,
+            title: it?.title || it?.headline || "",
+            url,
+            content: it?.content || it?.snippet || it?.excerpt || it?.description || "",
+          });
+          if (allResults.length >= 200) break;
+        }
+        if (allResults.length >= 200) break;
       }
-
-      const data = await resp.json().catch(() => ({}));
-      const rawResults = data?.results || data?.response || [];
-
-      const results = (rawResults || []).map((it) => ({
-        title: it?.title || it?.headline || "",
-        url: it?.url || it?.link || it?.source || null,
-        content: it?.content || it?.snippet || it?.excerpt || it?.description || "",
-      })).slice(0, 60);
-
-      console.log(`✅ SearxNG returned ${results.length} results`);
-      return res.json({ suppliers: results, queries: [searchQuery] });
+      clearTimeout(timeoutId);
+      console.log(`✅ Aggregated ${allResults.length} supplier hits from ${queries.length} queries`);
+      return res.json({ suppliers: allResults.slice(0, 200), queries });
     } catch (err) {
       clearTimeout(timeoutId);
-      console.error("❌ Error performing SearxNG search:", err?.message || err);
+      console.error("❌ Error searching SearxNG for queries:", err?.message || err);
       if (err.name === "AbortError") {
         return res.status(504).json({ error: "Search request timed out" });
       }
