@@ -653,24 +653,19 @@ export default function BriefingChat({
     setShowSupplierPrompt(true);
 
     // Use explicit override first, otherwise try lastCollectedInfo.
-    // If neither exists, reconstruct a minimal collectedInfo from the current messages
-    // so the yes/no prompt and retries always have a description/conversation.
-    let effectiveCollectedInfo = collectedInfoOverride || lastCollectedInfo;
+    // If neither exists, let the server reconstruct from briefingId (don't build a local fallback)
+    let effectiveCollectedInfo = collectedInfoOverride || lastCollectedInfo || null;
+
+    // If we have no collectedInfo yet, persist a prompt so state survives reloads
     if (!effectiveCollectedInfo) {
-      const fallback = {
-        description: messages.find((m) => m.role === "User")?.content || "",
-        conversationHistory: messages
-          .filter((m) => m.role === "AI" || m.role === "User")
-          .map((m) => ({ role: m.role === "User" ? "user" : "assistant", content: m.content })),
-      };
-      effectiveCollectedInfo = fallback;
-      setLastCollectedInfo(fallback);
-      // persist a prompt if none exists so state survives reloads
       setMessages((prev) => {
         const hasPrompt = prev.some((m) => m.role === "SupplierSearchPrompt");
-        const updated = hasPrompt ? prev : [...prev, { ...SUPPLIER_PROMPT_YESNO, collectedInfo: fallback }];
-        saveChatToSupabase(updated);
-        return updated;
+        if (!hasPrompt) {
+          const updated = [...prev, { ...SUPPLIER_PROMPT_YESNO, collectedInfo: null }];
+          saveChatToSupabase(updated);
+          return updated;
+        }
+        return prev;
       });
     }
 
@@ -715,6 +710,8 @@ export default function BriefingChat({
 
       const payloadBody = { collectedInfo: effectiveCollectedInfo };
       if (location) payloadBody.location = location;
+      // include briefingId so server can reconstruct if needed
+      payloadBody.briefingId = briefingId;
 
       const res = await fetch(`${API_URL}/search-suppliers`, {
         method: "POST",
@@ -757,7 +754,6 @@ export default function BriefingChat({
         appendMessage({ role: "AI", content: "❌ No suppliers found matching your request." });
         setAwaitingSupplierChoice(true);
         setAskingLocation(false);
-        // persist retry state and include collectedInfo
         setMessages((prev) => {
           // set or append the retry prompt using the canonical constant
           const updated = prev.map((m) =>
