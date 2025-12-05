@@ -28,7 +28,7 @@ export default function BriefingChat({
   const [customEmailText, setCustomEmailText] = useState("");
   const [recipientsText, setRecipientsText] = useState("");
 
-// Supplier search states (chat-driven)
+  // Supplier search states (chat-driven)
   const [awaitingSupplierChoice, setAwaitingSupplierChoice] = useState(false); // waiting for yes/no
   const [askingLocation, setAskingLocation] = useState(false); // waiting for location text (unified name)
   const [searchingSuppliers, setSearchingSuppliers] = useState(false);
@@ -149,6 +149,84 @@ export default function BriefingChat({
       return updated;
     });
   };
+
+  // If last AI message indicates the supplier search failure (substring match),
+  // surface the retry prompt and persist a SupplierSearchPrompt so it survives reloads.
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    const failureMarker = "Supplier search failed:";
+    if (
+      last?.role === "AI" &&
+      typeof last?.content === "string" &&
+      last.content.includes(failureMarker)
+    ) {
+      // Show retry UI
+      setAwaitingSupplierChoice(true);
+      setAskingLocation(false);
+      setSearchingSuppliers(false);
+
+      // Ensure a SupplierSearchPrompt exists and is marked for retry
+      const hasPrompt = messages.some((m) => m.role === "SupplierSearchPrompt");
+      if (!hasPrompt) {
+        appendMessage({
+          role: "SupplierSearchPrompt",
+          content: "Search failed - retry available",
+          collectedInfo: lastCollectedInfo || null,
+          retryMode: true,
+        });
+      } else {
+        // Update existing prompt message to set retryMode = true
+        setMessages((prev) => {
+          const updated = prev.map((m) =>
+            m.role === "SupplierSearchPrompt"
+              ? { ...m, content: "Search failed - retry available", retryMode: true, askingLocation: false }
+              : m
+          );
+          saveChatToSupabase(updated);
+          return updated;
+        });
+      }
+    }
+  }, [messages, lastCollectedInfo]);
+
+  // If the last persisted message is an Email, ensure the supplier yes/no prompt is shown
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    if (last?.role === "Email") {
+      // If already showing prompt, nothing to do
+      if (awaitingSupplierChoice || askingLocation) {
+        setEmailGenerated(true);
+        return;
+      }
+
+      // Ensure we mark email generated
+      setEmailGenerated(true);
+      setAwaitingSupplierChoice(true);
+
+      const hasPrompt = messages.some((m) => m.role === "SupplierSearchPrompt");
+      if (!hasPrompt) {
+        // persist a prompt so it survives reloads
+        appendMessage({
+          role: "SupplierSearchPrompt",
+          content: "Supplier search prompt active",
+          collectedInfo: lastCollectedInfo || null,
+          askingLocation: false,
+          retryMode: false,
+        });
+      } else {
+        // Make sure existing prompt flags are correct (not asking location)
+        setMessages((prev) => {
+          const updated = prev.map((m) =>
+            m.role === "SupplierSearchPrompt" ? { ...m, askingLocation: false } : m
+          );
+          saveChatToSupabase(updated);
+          return updated;
+        });
+      }
+    }
+  }, [messages]);
 
   // --- NEW: Helpers for sending email ---
   const getGeneratedEmail = () => {

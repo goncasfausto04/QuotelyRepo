@@ -1,5 +1,4 @@
 import express from "express";
-// Note: Node 18+ has native fetch. If on older Node, uncomment: import fetch from "node-fetch";
 
 export default function makeConversationRouter({
   ai,
@@ -290,179 +289,74 @@ Make it formal, clear, and ready to send to suppliers.
     }
   });
 
-  // Search suppliers
+  // Search suppliers (SearxNG)
   router.post("/search-suppliers", async (req, res) => {
-  const { briefingId, description, collectedInfo, location } = req.body;
+    const { description, collectedInfo, location } = req.body || {};
 
-  // Extract description from multiple possible locations
-  const searchDescription = description || collectedInfo?.description || collectedInfo?.conversationHistory?.[0]?.content;
+    // Build description from multiple possible fields
+    let searchDescription = description || collectedInfo?.description;
+    if (!searchDescription && collectedInfo?.conversationHistory?.length) {
+      const firstUser = collectedInfo.conversationHistory.find((m) => m.role === "user");
+      searchDescription = firstUser?.content || collectedInfo.conversationHistory[0]?.content;
+    }
 
-  if (!searchDescription?.trim()) {
-    return res.status(400).json({ 
-      error: "Description is required", 
-      received: { description, collectedInfo, location }
-    });
-  }
+    if (!searchDescription || !searchDescription.trim()) {
+      return res.status(400).json({ error: "Description is required" });
+    }
 
-  try {
-    console.log("🔍 Searching suppliers for:", searchDescription);
-    if (location) console.log("📍 Location:", location);
+    // Prepare SearxNG URL
+    const SEARXNG_URL = (process.env.SEARXNG_API_URL || "http://localhost:8080/search").replace(/\/+$/, "");
 
-    // Build search query with location if provided
+    // Build and sanitize query (Searx expects q param)
     const locationPart = location ? `${location} ` : "";
-    const searchQuery = `${locationPart}${searchDescription} suppliers contact email`;
+    const rawQuery = `${locationPart}${searchDescription} suppliers contact email`;
+    const searchQuery = rawQuery.replace(/[^\w\s@.-]/g, " ").replace(/\s+/g, " ").trim().substring(0, 400);
 
-    console.log("🔎 Search query:", searchQuery);
+    console.log(`🔍 Searching SearxNG: "${searchQuery}" via ${SEARXNG_URL}`);
 
-    // Use Brave client (injected from server.js)
-    if (!braveClient) {
-      return res.status(500).json({ error: "Search backend not configured" });
-    }
-
-    const searchResults = await braveClient.search(searchQuery, { size: 20 });
-    console.log(`✅ Brave returned ${searchResults.length} results`);
-
-    if (!searchResults || searchResults.length === 0) {
-      return res.json({
-        suppliers: [],
-        message: "No suppliers found. Try refining your search.",
-      });
-    }
-
-    // Process and filter results for suppliers with email addresses
-    const suppliers = [];
-
-    for (const result of searchResults) {
-      const title = result.title || "";
-      const content = result.content || "";
-      const url = result.url || "";
-
-      // Look for email patterns in the description or title
-      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-      const foundEmails = [
-        ...new Set([
-          ...(title.match(emailRegex) || []),
-          ...(content.match(emailRegex) || []),
-        ]),
-      ];
-
-      // Filter out common non-business emails
-      const validEmails = foundEmails.filter(
-        (email) =>
-          !email.includes("example.com") &&
-          !email.includes("test.com") &&
-          !email.includes("placeholder")
-      );
-
-      // Check if this looks like a supplier/business
-      const supplierKeywords = [
-        "supplier",
-        "manufacturer",
-        "distributor",
-        "wholesale",
-        "vendor",
-        "company",
-        "inc",
-        "ltd",
-        "llc",
-        "corp",
-        "contact",
-        "sales",
-      ];
-
-      const isLikelySupplier = supplierKeywords.some(
-        (keyword) =>
-          title.toLowerCase().includes(keyword) ||
-          content.toLowerCase().includes(keyword)
-      );
-
-      if (validEmails.length > 0 || isLikelySupplier) {
-        suppliers.push({
-          name: title,
-          website: url,
-          description: content,
-          emails: validEmails,
-          hasEmail: validEmails.length > 0,
-        });
-      }
-    }
-
-    // Prioritize suppliers with emails
-    suppliers.sort((a, b) => {
-      if (a.hasEmail && !b.hasEmail) return -1;
-      if (!a.hasEmail && b.hasEmail) return 1;
-      return 0;
-    });
-
-    console.log(`✅ Found ${suppliers.length} potential suppliers`);
-    console.log(
-      `📧 ${suppliers.filter((s) => s.hasEmail).length} with email addresses`
-    );
-
-    // If we need more suppliers with emails, try a second search
-    const suppliersWithEmails = suppliers.filter((s) => s.hasEmail);
-    
-    if (suppliersWithEmails.length < 3) {
-      console.log("🔄 Running additional search for suppliers with emails...");
-      
-      const refinedQuery = `${description} supplier email contact sales`;
-      const refinedResults = await braveClient.search(refinedQuery, {
-        count: 10,
+    // Fetch with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    try {
+      const params = new URLSearchParams({
+        q: searchQuery,
+        format: "json",
+        language: "en",
+        categories: "general",
       });
 
-      if (refinedResults?.web?.results) {
-        for (const result of refinedResults.web.results) {
-          const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-          const foundEmails = [
-            ...new Set([
-              ...((result.title || "").match(emailRegex) || []),
-              ...((result.description || "").match(emailRegex) || []),
-            ]),
-          ];
+      const resp = await fetch(`${SEARXNG_URL}?${params.toString()}`, {
+        signal: controller.signal,
+        headers: { "User-Agent": "Quotely/1.0" },
+      });
+      clearTimeout(timeoutId);
 
-          const validEmails = foundEmails.filter(
-            (email) =>
-              !email.includes("example.com") &&
-              !email.includes("test.com") &&
-              !email.includes("placeholder")
-          );
-
-          if (validEmails.length > 0) {
-            // Check if not already in results
-            const isDuplicate = suppliers.some(
-              (s) => s.website === result.url
-            );
-            if (!isDuplicate) {
-              suppliers.push({
-                name: result.title || "",
-                website: result.url || "",
-                description: result.description || "",
-                emails: validEmails,
-                hasEmail: true,
-              });
-            }
-          }
-        }
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => "");
+        console.error("❌ SearxNG returned non-ok:", resp.status, txt.slice(0, 200));
+        return res.status(502).json({ error: "Search backend error", details: txt });
       }
+
+      const data = await resp.json().catch(() => ({}));
+      const rawResults = data?.results || data?.response || [];
+
+      const results = (rawResults || []).map((it) => ({
+        title: it?.title || it?.headline || "",
+        url: it?.url || it?.link || it?.source || null,
+        content: it?.content || it?.snippet || it?.excerpt || it?.description || "",
+      })).slice(0, 60);
+
+      console.log(`✅ SearxNG returned ${results.length} results`);
+      return res.json({ suppliers: results, queries: [searchQuery] });
+    } catch (err) {
+      clearTimeout(timeoutId);
+      console.error("❌ Error performing SearxNG search:", err?.message || err);
+      if (err.name === "AbortError") {
+        return res.status(504).json({ error: "Search request timed out" });
+      }
+      return res.status(500).json({ error: "Supplier search failed", details: err?.message || String(err) });
     }
-
-    res.json({
-      suppliers: suppliers.slice(0, 15), // Return top 15 results
-      total: suppliers.length,
-      withEmails: suppliers.filter((s) => s.hasEmail).length,
-      message:
-        suppliers.length > 0
-          ? `Found ${suppliers.length} potential suppliers`
-          : "No suppliers found. Try refining your search terms.",
-    });
-  } catch (error) {
-    console.error("❌ Error searching suppliers:", error);
-    res.status(500).json({
-      error: "Failed to search suppliers",
-      details: error.message,
-    });
-  }
-});
-
+  });
+  
   return router;
 }
