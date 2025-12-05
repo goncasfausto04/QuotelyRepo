@@ -80,7 +80,18 @@ export default function makeEmailRouter({ supabase }) {
 
       const messages = await getThreadMessages(threadId);
       messages.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-      res.json({ ok: true, threadId, emails: messages });
+      const ownSender = (process.env.GMAIL_API_SENDER || "").toLowerCase().trim();
+
+      // If GMAIL_API_SENDER is configured, filter out messages that come from that address
+      let emailsToReturn = messages || [];
+      if (ownSender) {
+        emailsToReturn = emailsToReturn.filter((e) => {
+          const from = (e.from || "").toLowerCase();
+          return !from.includes(ownSender);
+        });
+      }
+
+      return res.json({ ok: true, threadId, emails: emailsToReturn });
     } catch (err) {
       console.error("Error fetching briefing emails:", err);
       res.status(500).json({ error: "Failed to fetch briefing emails", details: err.message });
@@ -89,14 +100,4 @@ export default function makeEmailRouter({ supabase }) {
 
   return router;
 }
-
-// --- to send an email through powershell for test --- DELETE LATER
-
-// $payload = @{
-//  subject    = "Quotely test email"
-//  body       = "This is a test email from Quotely - ignore."
-//  recipients = @("test@example.com") -- change to your email
-//  isHtml     = $false
-//}
-// Invoke-RestMethod -Method Post -Uri http://localhost:3001/api/send-email -ContentType 'application/json' -Body ($payload | ConvertTo-Json)
 
