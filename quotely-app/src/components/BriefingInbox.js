@@ -25,7 +25,7 @@ export default function BriefingInbox({ briefingId }) {
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
 
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
+  const API_URL = process.env.REACT_APP_API_URL || "https://quotely-repo.vercel.app/";
 
   // Fetch emails for this briefing
   const fetchEmails = useCallback(async () => {
