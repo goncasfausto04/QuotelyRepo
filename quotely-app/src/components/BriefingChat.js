@@ -34,12 +34,31 @@ export default function BriefingChat({
   const [searchingSuppliers, setSearchingSuppliers] = useState(false);
   const [supplierResults, setSupplierResults] = useState([]);
   const [lastCollectedInfo, setLastCollectedInfo] = useState(null);
-  const [showSupplierPrompt, setShowSupplierPrompt] = useState(false); // kept for backward compatibility in some logic, but not rendered
+  const [showSupplierPrompt, setShowSupplierPrompt] = useState(false); // UI/persisted prompt helper
   const [locationInput, setLocationInput] = useState("");
   // UI state for supplier-to-email action
   const [applyingSupplier, setApplyingSupplier] = useState(null);
   // ref for chat scroll container
   const chatContainerRef = useRef(null);
+
+  // Prompts for supplier flow
+  const SUPPLIER_PROMPT_YESNO = {
+    role: "SupplierSearchPrompt",
+    content:
+      "Would you like me to search for potential suppliers that match this request? Reply 'yes' or 'no'.",
+    collectedInfo: null,
+    askingLocation: false,
+    retryMode: false,
+  };
+
+  const SUPPLIER_PROMPT_RETRY = {
+    role: "SupplierSearchPrompt",
+    content:
+      "Would you like to try searching again? Reply 'yes' to try again or 'no' to skip.",
+    collectedInfo: null,
+    askingLocation: false,
+    retryMode: true,
+  };
 
   // auto-scroll to bottom whenever messages (or loading) change
   useEffect(() => {
@@ -169,19 +188,12 @@ export default function BriefingChat({
       // Ensure a SupplierSearchPrompt exists and is marked for retry
       const hasPrompt = messages.some((m) => m.role === "SupplierSearchPrompt");
       if (!hasPrompt) {
-        appendMessage({
-          role: "SupplierSearchPrompt",
-          content: "Search failed - retry available",
-          collectedInfo: lastCollectedInfo || null,
-          retryMode: true,
-        });
+        appendMessage({ ...SUPPLIER_PROMPT_RETRY, collectedInfo: lastCollectedInfo || null });
       } else {
         // Update existing prompt message to set retryMode = true
         setMessages((prev) => {
           const updated = prev.map((m) =>
-            m.role === "SupplierSearchPrompt"
-              ? { ...m, content: "Search failed - retry available", retryMode: true, askingLocation: false }
-              : m
+            m.role === "SupplierSearchPrompt" ? { ...m, ...SUPPLIER_PROMPT_RETRY, collectedInfo: lastCollectedInfo || null } : m
           );
           saveChatToSupabase(updated);
           return updated;
@@ -451,8 +463,7 @@ export default function BriefingChat({
         
         // ✅ SAVE: Persist supplier search prompt state to chat
         appendMessage({
-          role: "SupplierSearchPrompt", 
-          content: "Supplier search prompt active",
+          ...SUPPLIER_PROMPT_YESNO,
           collectedInfo: data.collectedInfo,
           // This message won't be visible in the UI - it's just for state persistence
         });
@@ -637,44 +648,59 @@ export default function BriefingChat({
   };
 
   // --- NEW: handle supplier search
-  const handleSupplierSearch = async (choice, locationInputFromUser = null) => {
+  const handleSupplierSearch = async (choice, locationInputFromUser = null, collectedInfoOverride = null) => {
     // choice: "yes" | "no" | "location-submitted"
-    // locationInputFromUser: optional free-text location supplied by the user
-    setShowSupplierPrompt(false);
-    if (!lastCollectedInfo) return;
+    setShowSupplierPrompt(true);
 
-    // If user declines
+    // Use explicit override first, otherwise try lastCollectedInfo.
+    // If neither exists, reconstruct a minimal collectedInfo from the current messages
+    // so the yes/no prompt and retries always have a description/conversation.
+    let effectiveCollectedInfo = collectedInfoOverride || lastCollectedInfo;
+    if (!effectiveCollectedInfo) {
+      const fallback = {
+        description: messages.find((m) => m.role === "User")?.content || "",
+        conversationHistory: messages
+          .filter((m) => m.role === "AI" || m.role === "User")
+          .map((m) => ({ role: m.role === "User" ? "user" : "assistant", content: m.content })),
+      };
+      effectiveCollectedInfo = fallback;
+      setLastCollectedInfo(fallback);
+      // persist a prompt if none exists so state survives reloads
+      setMessages((prev) => {
+        const hasPrompt = prev.some((m) => m.role === "SupplierSearchPrompt");
+        const updated = hasPrompt ? prev : [...prev, { ...SUPPLIER_PROMPT_YESNO, collectedInfo: fallback }];
+        saveChatToSupabase(updated);
+        return updated;
+      });
+    }
+
+    // user declined
     if (choice === "no") {
       appendMessage({ role: "AI", content: "Okay — not searching for suppliers right now." });
       setAwaitingSupplierChoice(false);
       setAskingLocation(false);
       setLastCollectedInfo(null);
-      
-      // ✅ CLEAR: Remove supplier search prompt from chat when declined
+      // remove persisted prompt
       setMessages((prev) => {
-        const updated = prev.filter(msg => msg.role !== "SupplierSearchPrompt");
+        const updated = prev.filter((msg) => msg.role !== "SupplierSearchPrompt");
         saveChatToSupabase(updated);
         return updated;
       });
       return;
     }
 
-    // If user accepted but we don't have a delivery location yet, ask for it in chat
-    if (choice === "yes" && !lastCollectedInfo.location && !locationInputFromUser) {
+    // ask for location if needed (don't ask for location when caller explicitly passed collectedInfoOverride)
+    const forceSearch = !!collectedInfoOverride;
+    if (choice === "yes" && !effectiveCollectedInfo.location && !locationInputFromUser && !forceSearch) {
       appendMessage({
         role: "AI",
-        content:
-          "Where should I look for suppliers? Please provide a city, region, or postal code (or type 'any').",
+        content: "Where should I look for suppliers? Please provide a city, region, or postal code (or type 'any').",
       });
       setAwaitingSupplierChoice(false);
       setAskingLocation(true);
-      
-      // ✅ UPDATE: Update supplier search state in chat to "asking location"
       setMessages((prev) => {
-        const updated = prev.map(msg => 
-          msg.role === "SupplierSearchPrompt" 
-            ? { ...msg, content: "Asking for location", askingLocation: true }
-            : msg
+        const updated = prev.map((msg) =>
+          msg.role === "SupplierSearchPrompt" ? { ...msg, content: "Asking for location", askingLocation: true } : msg
         );
         saveChatToSupabase(updated);
         return updated;
@@ -682,14 +708,12 @@ export default function BriefingChat({
       return;
     }
 
-    // Determine location to search
-    const location = locationInputFromUser || lastCollectedInfo.location || null;
-
+    const location = locationInputFromUser || effectiveCollectedInfo.location || null;
     setSearchingSuppliers(true);
     try {
       appendMessage({ role: "AI", content: `🔎 Searching for suppliers${location ? ` near ${location}` : ""}...` });
 
-      const payloadBody = { collectedInfo: lastCollectedInfo };
+      const payloadBody = { collectedInfo: effectiveCollectedInfo };
       if (location) payloadBody.location = location;
 
       const res = await fetch(`${API_URL}/search-suppliers`, {
@@ -699,68 +723,105 @@ export default function BriefingChat({
       });
 
       const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.error || `Status ${res.status}`);
+      // server returns { suppliers: [...], queries: [...] }
+      const results = Array.isArray(payload.suppliers) ? payload.suppliers : [];
+      const queries = Array.isArray(payload.queries) ? payload.queries : [];
 
-      const suppliers = payload.suppliers || [];
-      if (suppliers.length === 0) {
+      // Normalize results into the UI supplier object shape
+      const mapped = results.map((r) => {
+        // r may be an AI-synth object or a Searx hit { query, title, url, content }
+        const name =
+          r.name ||
+          r.title ||
+          (r.query ? `${r.query}` : null) ||
+          null;
+        const website = r.website || r.url || r.link || null;
+        const contact_email = r.contact_email || r.email || null;
+        const phone = r.phone || null;
+        const note = r.note || r.content || (r.query ? `Matched by query: ${r.query}` : "");
+        return {
+          name,
+          contact_email,
+          phone,
+          website,
+          note,
+          // preserve raw for debugging
+          __raw: r,
+        };
+      }).filter((s) => s.name || s.contact_email || s.website || s.phone || s.note);
+
+      if (mapped.length === 0) {
+        // Ensure we keep collectedInfo so the Yes button can retry without forcing a location prompt.
+        setLastCollectedInfo(effectiveCollectedInfo);
+
         appendMessage({ role: "AI", content: "❌ No suppliers found matching your request." });
-        // Keep the search again option available even if no results
         setAwaitingSupplierChoice(true);
         setAskingLocation(false);
-        // Save retry state to chat for persistence
+        // persist retry state and include collectedInfo
         setMessages((prev) => {
-          const updated = prev.map(msg => 
-            msg.role === "SupplierSearchPrompt" 
-              ? { ...msg, content: "No results - retry available", retryMode: true, askingLocation: false }
-              : msg
+          // set or append the retry prompt using the canonical constant
+          const updated = prev.map((m) =>
+            m.role === "SupplierSearchPrompt" ? { ...m, ...SUPPLIER_PROMPT_RETRY, collectedInfo: effectiveCollectedInfo } : m
           );
+          if (!updated.some((m) => m.role === "SupplierSearchPrompt")) {
+            updated.push({ ...SUPPLIER_PROMPT_RETRY, collectedInfo: effectiveCollectedInfo });
+          }
           saveChatToSupabase(updated);
           return updated;
         });
       } else {
-        appendMessage({ role: "AI", content: `✅ Found ${suppliers.length} potential suppliers:` });
-        setSupplierResults(suppliers);
-        
-        // ✅ PERSIST: Save supplier results to chat so they survive page reloads
+        appendMessage({ role: "AI", content: `✅ Found ${mapped.length} potential suppliers:` });
+        setSupplierResults(mapped);
+
+        // persist supplier results so they survive reloads
         appendMessage({
           role: "SupplierResults",
-          content: JSON.stringify(suppliers),
-          // This message won't be visible in the UI - it's just for persistence
+          content: JSON.stringify(mapped),
         });
-        
-        if (onSuppliersFound) onSuppliersFound(suppliers);
-        
-        // ✅ SUCCESS: Clear supplier search prompt only on successful search with results
+
+        if (typeof onSuppliersFound === "function") {
+          try {
+            onSuppliersFound(mapped);
+          } catch (e) {
+            console.warn("onSuppliersFound handler error:", e);
+          }
+        }
+
+        // clear persisted prompt on success
         setMessages((prev) => {
-          const updated = prev.filter(msg => msg.role !== "SupplierSearchPrompt");
+          const updated = prev.filter((msg) => msg.role !== "SupplierSearchPrompt");
           saveChatToSupabase(updated);
           return updated;
         });
       }
     } catch (err) {
       console.error("Supplier search failed:", err);
-      appendMessage({
-        role: "AI",
-        content: `❌ Supplier search failed: ${err.message || String(err)}`,
-      });
-      // Keep the search again option available even on error
-      setAwaitingSupplierChoice(true);
-      setAskingLocation(false);
-      // Save retry state to chat for persistence on error
+      // Keep collectedInfo so retrying uses same context
+      setLastCollectedInfo(effectiveCollectedInfo);
+
+      appendMessage({ role: "AI", content: `❌ Supplier search failed: ${err.message || String(err)}` });
+      // persist retry state
       setMessages((prev) => {
-        const updated = prev.map(msg => 
-          msg.role === "SupplierSearchPrompt" 
-            ? { ...msg, content: "Search failed - retry available", retryMode: true, askingLocation: false }
-            : msg
+        const updated = prev.map((m) =>
+          m.role === "SupplierSearchPrompt" ? { ...m, content: "Search failed - retry available", retryMode: true, askingLocation: false, collectedInfo: effectiveCollectedInfo } : m
         );
+        if (!updated.some((m) => m.role === "SupplierSearchPrompt")) {
+          updated.push({
+            role: "SupplierSearchPrompt",
+            content: "Search failed - retry available",
+            collectedInfo: effectiveCollectedInfo,
+            retryMode: true,
+            askingLocation: false,
+          });
+        }
         saveChatToSupabase(updated);
         return updated;
       });
     } finally {
       setSearchingSuppliers(false);
-      // Don't reset these - allow "Search Again" to work
-      // setAwaitingSupplierChoice(false); 
-      // setLastCollectedInfo(null);
+      setAskingLocation(false);
+      setAwaitingSupplierChoice(false);
+      // don't clear lastCollectedInfo here; keep it so the user can click "Yes" to retry
     }
   };
 
@@ -820,23 +881,23 @@ export default function BriefingChat({
               </span>
               <button
                 onClick={() => {
-                  // Clear current results and restart supplier search flow
+                  // Build a collectedInfo object synchronously and pass it to the handler
+                  const fallbackCollected = lastCollectedInfo || {
+                    description: messages.find((m) => m.role === "User")?.content || "",
+                    conversationHistory: messages
+                      .filter((m) => m.role === "AI" || m.role === "User")
+                      .map((m) => ({ role: m.role === "User" ? "user" : "assistant", content: m.content })),
+                  };
+
+                  // Clear UI results and persist a prompt state
                   setSupplierResults([]);
                   setAwaitingSupplierChoice(true);
-                  setLastCollectedInfo(lastCollectedInfo || { 
-                    description: messages.find(m => m.role === "User")?.content || "",
-                    conversationHistory: []
-                  });
-                  // Save retry state when manually triggering search again
-                  appendMessage({
-                    role: "SupplierSearchPrompt", 
-                    content: "Manual retry - searching again",
-                    collectedInfo: lastCollectedInfo || { 
-                      description: messages.find(m => m.role === "User")?.content || "",
-                      conversationHistory: []
-                    },
-                    retryMode: true,
-                  });
+                  setLastCollectedInfo(fallbackCollected);
+                  // persist canonical retry prompt
+                  appendMessage({ ...SUPPLIER_PROMPT_RETRY, collectedInfo: fallbackCollected });
+
+                  // Immediately trigger the search using the constructed collectedInfo so it doesn't rely on async state updates
+                  handleSupplierSearch("yes", null, fallbackCollected);
                 }}
                 disabled={searchingSuppliers || awaitingSupplierChoice}
                 className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"

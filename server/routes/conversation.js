@@ -7,7 +7,6 @@ export default function makeConversationRouter({
   loadConversationFromDb,
   conversations,
   supabase,
-  braveClient, // <- injected from server.js
 }) {
   const router = express.Router();
 
@@ -291,7 +290,52 @@ Make it formal, clear, and ready to send to suppliers.
 
   // Search suppliers (SearxNG)
   router.post("/search-suppliers", async (req, res) => {
-    const { collectedInfo, location } = req.body;
+    const briefingId = req.body.briefingId;
+    if (!briefingId) return res.status(400).json({ error: "briefingId required" });
+
+    // Try in-memory first, then DB conversation_state, then reconstruct from briefings.chat
+    let conversation = conversations.get(briefingId) || null;
+    if (!conversation) {
+      conversation = await loadConversationFromDb(briefingId);
+    }
+
+    if (!conversation) {
+      // Reconstruct from chat messages (same approach as /next-question)
+      const { data, error } = await supabase
+        .from("briefings")
+        .select("chat")
+        .eq("id", briefingId)
+        .single();
+
+      if (error || !data?.chat || data.chat.length === 0) {
+        return res.status(400).json({ error: "Conversation not found" });
+      }
+
+      const chatMessages = data.chat;
+      const description = chatMessages.find((msg) => msg.role === "User")?.content || "";
+
+      conversation = {
+        history: chatMessages
+          .filter((msg) => msg.role === "AI" || msg.role === "User")
+          .map((msg) => ({
+            role: msg.role === "User" ? "user" : "assistant",
+            content: msg.content,
+          })),
+        description,
+        briefingId,
+      };
+    }
+
+    // Ensure it's cached in-memory for future requests
+    conversations.set(briefingId, conversation);
+
+    const cInfo = {
+      description: conversation.description,
+      conversationHistory: conversation.history,
+    };
+
+    const { location } = req.body;
+    const collectedInfo = req.body.collectedInfo || cInfo;
     if (!collectedInfo || !collectedInfo.description) {
       return res.status(400).json({ error: "collectedInfo.description required" });
     }
