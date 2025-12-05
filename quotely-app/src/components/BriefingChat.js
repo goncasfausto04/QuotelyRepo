@@ -76,6 +76,27 @@ export default function BriefingChat({
             // mark that an email exists without marking the conversation as "over"
             setEmailGenerated(true);
             console.log("✅ Loaded briefing with generated email");
+            
+            // ✅ RESTORE: find the most recent SupplierSearchPrompt anywhere in the chat
+            const lastPrompt = [...data.chat].reverse().find((m) => m.role === "SupplierSearchPrompt");
+            if (lastPrompt) {
+              setLastCollectedInfo(lastPrompt.collectedInfo || null);
+              // If prompt was asking for location, restore askingLocation state
+              if (lastPrompt.askingLocation) {
+                setAwaitingSupplierChoice(false);
+                setAskingLocation(true);
+              } else {
+                // default: show yes/no (or retry) choice
+                setAwaitingSupplierChoice(true);
+                setAskingLocation(false);
+              }
+              // If prompt marked retryMode, ensure the retry UI is available
+              if (lastPrompt.retryMode) {
+                setAwaitingSupplierChoice(true);
+                setAskingLocation(false);
+              }
+              console.log("✅ Restored supplier search prompt state from persisted prompt");
+            }
           }
 
           // ✅ RESTORE: Load supplier results from chat messages
@@ -201,10 +222,15 @@ export default function BriefingChat({
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
-    // allow user to reply to supplier prompts even after an email was generated
+    // ✅ BLOCK: If email was generated, only allow supplier search interactions
     if (emailGenerated && !awaitingSupplierChoice && !askingLocation && !searchingSuppliers) {
-      // if an email exists and there is no active supplier flow, still allow normal chat;
-      // do not treat email generation as conversation end — so do NOT block here.
+      appendMessage({ role: "User", content: input.trim() });
+      setInput("");
+      appendMessage({ 
+        role: "AI", 
+        content: "The briefing is complete and email has been generated. Use the 'Start New Request' button to create a new quote request, or use the supplier search options above." 
+      });
+      return;
     }
 
     const userInput = input.trim();
@@ -230,6 +256,16 @@ export default function BriefingChat({
     if (askingLocation) {
       const locationText = userInput;
       await handleSupplierSearch("location-submitted", locationText);
+      setIsLoading(false);
+      return;
+    }
+
+    // ✅ ADDITIONAL SAFETY: If somehow email is generated but we're not in supplier flow, block
+    if (emailGenerated) {
+      appendMessage({ 
+        role: "AI", 
+        content: "This briefing is complete. Please use 'Start New Request' to create a new quote request." 
+      });
       setIsLoading(false);
       return;
     }
@@ -332,8 +368,16 @@ export default function BriefingChat({
         // mark that an email has been generated (conversation remains open)
         setEmailGenerated(true);
         setLastCollectedInfo(data.collectedInfo);
-        // Show the supplier choice buttons (no chat message needed)
+        // Show the supplier choice buttons and save state to chat
         setAwaitingSupplierChoice(true);
+        
+        // ✅ SAVE: Persist supplier search prompt state to chat
+        appendMessage({
+          role: "SupplierSearchPrompt", 
+          content: "Supplier search prompt active",
+          collectedInfo: data.collectedInfo,
+          // This message won't be visible in the UI - it's just for state persistence
+        });
       }
       // CASE 2B: Ask next question
       else {
@@ -372,6 +416,19 @@ export default function BriefingChat({
     setIsConversationStarted(false);
     setConversationComplete(false);
     setEmailGenerated(false);
+    // ✅ RESET: Clear supplier search states
+    setAwaitingSupplierChoice(false);
+    setAskingLocation(false);
+    setSearchingSuppliers(false);
+    setSupplierResults([]);
+    setLastCollectedInfo(null);
+    setShowSupplierPrompt(false);
+    // Clear any persisted search retry state
+    setMessages((prev) => {
+      const updated = prev.filter(msg => msg.role !== "SupplierSearchPrompt");
+      saveChatToSupabase(updated);
+      return updated;
+    });
     setMessages([
       {
         role: "AI",
@@ -514,6 +571,13 @@ export default function BriefingChat({
       setAwaitingSupplierChoice(false);
       setAskingLocation(false);
       setLastCollectedInfo(null);
+      
+      // ✅ CLEAR: Remove supplier search prompt from chat when declined
+      setMessages((prev) => {
+        const updated = prev.filter(msg => msg.role !== "SupplierSearchPrompt");
+        saveChatToSupabase(updated);
+        return updated;
+      });
       return;
     }
 
@@ -526,6 +590,17 @@ export default function BriefingChat({
       });
       setAwaitingSupplierChoice(false);
       setAskingLocation(true);
+      
+      // ✅ UPDATE: Update supplier search state in chat to "asking location"
+      setMessages((prev) => {
+        const updated = prev.map(msg => 
+          msg.role === "SupplierSearchPrompt" 
+            ? { ...msg, content: "Asking for location", askingLocation: true }
+            : msg
+        );
+        saveChatToSupabase(updated);
+        return updated;
+      });
       return;
     }
 
@@ -553,6 +628,17 @@ export default function BriefingChat({
         appendMessage({ role: "AI", content: "❌ No suppliers found matching your request." });
         // Keep the search again option available even if no results
         setAwaitingSupplierChoice(true);
+        setAskingLocation(false);
+        // Save retry state to chat for persistence
+        setMessages((prev) => {
+          const updated = prev.map(msg => 
+            msg.role === "SupplierSearchPrompt" 
+              ? { ...msg, content: "No results - retry available", retryMode: true, askingLocation: false }
+              : msg
+          );
+          saveChatToSupabase(updated);
+          return updated;
+        });
       } else {
         appendMessage({ role: "AI", content: `✅ Found ${suppliers.length} potential suppliers:` });
         setSupplierResults(suppliers);
@@ -565,6 +651,13 @@ export default function BriefingChat({
         });
         
         if (onSuppliersFound) onSuppliersFound(suppliers);
+        
+        // ✅ SUCCESS: Clear supplier search prompt only on successful search with results
+        setMessages((prev) => {
+          const updated = prev.filter(msg => msg.role !== "SupplierSearchPrompt");
+          saveChatToSupabase(updated);
+          return updated;
+        });
       }
     } catch (err) {
       console.error("Supplier search failed:", err);
@@ -574,9 +667,19 @@ export default function BriefingChat({
       });
       // Keep the search again option available even on error
       setAwaitingSupplierChoice(true);
+      setAskingLocation(false);
+      // Save retry state to chat for persistence on error
+      setMessages((prev) => {
+        const updated = prev.map(msg => 
+          msg.role === "SupplierSearchPrompt" 
+            ? { ...msg, content: "Search failed - retry available", retryMode: true, askingLocation: false }
+            : msg
+        );
+        saveChatToSupabase(updated);
+        return updated;
+      });
     } finally {
       setSearchingSuppliers(false);
-      setAskingLocation(false);
       // Don't reset these - allow "Search Again" to work
       // setAwaitingSupplierChoice(false); 
       // setLastCollectedInfo(null);
@@ -598,7 +701,7 @@ export default function BriefingChat({
         className="mb-4 h-64 sm:h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded p-4 bg-gray-50 dark:bg-gray-900"
       >
         {messages
-          .filter((msg) => msg.role !== "SupplierResults") // Remove SupplierResults from visible messages
+          .filter((msg) => msg.role !== "SupplierResults" && msg.role !== "SupplierSearchPrompt") // Remove hidden state messages
           .map((msg, idx) => (
           <div
             key={idx}
@@ -645,6 +748,16 @@ export default function BriefingChat({
                   setLastCollectedInfo(lastCollectedInfo || { 
                     description: messages.find(m => m.role === "User")?.content || "",
                     conversationHistory: []
+                  });
+                  // Save retry state when manually triggering search again
+                  appendMessage({
+                    role: "SupplierSearchPrompt", 
+                    content: "Manual retry - searching again",
+                    collectedInfo: lastCollectedInfo || { 
+                      description: messages.find(m => m.role === "User")?.content || "",
+                      conversationHistory: []
+                    },
+                    retryMode: true,
                   });
                 }}
                 disabled={searchingSuppliers || awaitingSupplierChoice}
@@ -712,7 +825,11 @@ export default function BriefingChat({
         {awaitingSupplierChoice && (
           <div className="my-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700">
             <p className="text-blue-900 dark:text-blue-100 mb-3 font-medium">
-              Would you like me to search for potential suppliers that match this request?
+              {/* Show different message if this is a retry vs initial search */}
+              {messages.some(m => m.role === "SupplierSearchPrompt" && m.retryMode)
+                ? "Would you like to try searching for suppliers again? You can try a different location or search approach."
+                : "Would you like me to search for potential suppliers that match this request?"
+              }
             </p>
             <div className="flex gap-3">
               <button
@@ -720,7 +837,10 @@ export default function BriefingChat({
                 disabled={searchingSuppliers}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
-                Yes, find suppliers
+                {messages.some(m => m.role === "SupplierSearchPrompt" && m.retryMode)
+                  ? "Yes, try again"
+                  : "Yes, find suppliers"
+                }
               </button>
               <button
                 onClick={() => handleSupplierSearch("no")}
@@ -728,6 +848,55 @@ export default function BriefingChat({
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
                 No, thanks
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* LOCATION INPUT BOX: appears after user accepts supplier search */}
+        {askingLocation && (
+          <div className="my-4 p-4 rounded-lg bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700">
+            <p className="text-green-900 dark:text-green-100 mb-2 font-medium">
+              Where should I look for suppliers? Enter a city, region, or postal code (or type "any").
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={locationInput}
+                onChange={(e) => setLocationInput(e.target.value)}
+                placeholder="e.g., Lisbon, Benfica or type 'any'"
+                className="flex-1 border-2 border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+              <button
+                onClick={() => {
+                  const loc = (locationInput || "any").trim() || "any";
+                  // submit location and clear input
+                  handleSupplierSearch("location-submitted", loc);
+                  setLocationInput("");
+                }}
+                disabled={searchingSuppliers}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Search
+              </button>
+              <button
+                onClick={() => {
+                  // cancel location entry and return to Yes/No prompt
+                  setAskingLocation(false);
+                  setAwaitingSupplierChoice(true);
+                  setLocationInput("");
+                  // persist state change to avoid stale askingLocation flag
+                  setMessages((prev) => {
+                    const updated = prev.map(msg =>
+                      msg.role === "SupplierSearchPrompt" ? { ...msg, askingLocation: false } : msg
+                    );
+                    saveChatToSupabase(updated);
+                    return updated;
+                  });
+                }}
+                className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+              >
+                Cancel
               </button>
             </div>
           </div>
@@ -755,16 +924,16 @@ export default function BriefingChat({
               : "Type your answer..."
           }
           // disable while loading or waiting for button choice
-          disabled={isLoading || awaitingSupplierChoice}
+          disabled={isLoading || awaitingSupplierChoice || askingLocation}
         />
         <button
           className={`w-full sm:w-auto px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors ${
-            isLoading || !input.trim() || awaitingSupplierChoice
+            isLoading || !input.trim() || awaitingSupplierChoice || askingLocation
               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
               : "bg-blue-600 text-white hover:bg-blue-700"
            }`}
            onClick={sendMessage}
-           disabled={isLoading || !input.trim() || awaitingSupplierChoice}
+           disabled={isLoading || !input.trim() || awaitingSupplierChoice || askingLocation}
          >
            {isLoading ? "..." : "Send"}
          </button>
