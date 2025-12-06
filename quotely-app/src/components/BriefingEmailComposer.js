@@ -1,25 +1,35 @@
+// used to write briefing email and send via API
+// allows choosing generated or custom email body
+// used in briefing inbox view
+
 import { useState, useEffect } from "react";
 
 export default function BriefingEmailComposer({ briefingId, getGeneratedEmail, onSent }) {
-  const [sendOption, setSendOption] = useState("generated"); // 'generated' | 'custom'
-  const [customEmailText, setCustomEmailText] = useState("");
-  const [recipientsText, setRecipientsText] = useState("");
-  const [sendLoading, setSendLoading] = useState(false);
+  const [sendOption, setSendOption] = useState("generated"); // user options: generated, custom ; starts with generated
+  const [customEmailText, setCustomEmailText] = useState(""); // custom email body if user chooses that
+  const [recipientsText, setRecipientsText] = useState(""); // comma-separated recipient emails
+  const [sendLoading, setSendLoading] = useState(false); // loading state for sending email
 
   // Persist generated email so it doesn't vanish when toggling or sending
   const [generatedText, setGeneratedText] = useState(
-    getGeneratedEmail ? getGeneratedEmail() : ""
+    getGeneratedEmail ? getGeneratedEmail() : "" // either from prop if function provided or empty if no email generated yet
   );
 
+  // run when getGeneratedEmail prop changes
   useEffect(() => {
+    // Check if getGeneratedEmail is a function (passed as prop from parent)
     if (typeof getGeneratedEmail === "function") {
+      // Call the function to get the latest generated email text
       const val = getGeneratedEmail();
+      // Update the generatedText state with the value (or empty string if null/undefined)
       setGeneratedText(val || "");
     }
-  }, [getGeneratedEmail]);
+  }, [getGeneratedEmail]); // Re-run this effect whenever getGeneratedEmail changes
 
+  // Send email via backend API
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
 
+  // send through post to /api/send-email ( located in server/routes/email.js )
   const sendEmailForBriefing = async () => {
     if (sendLoading) return;
     const body =
@@ -69,6 +79,7 @@ export default function BriefingEmailComposer({ briefingId, getGeneratedEmail, o
     }
   };
 
+  // copy email body to clipboard
   const copyBody = () => {
     const body = sendOption === "generated" ? generatedText : customEmailText;
     if (body) {
