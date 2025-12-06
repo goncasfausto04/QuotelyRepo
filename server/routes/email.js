@@ -1,25 +1,22 @@
 import express from "express";
-import { sendEmail, getThreadMessages, findThreadIdByBriefingToken } from "../email_send.js";
+import { sendEmail, getThreadMessages } from "../email_gmail.js";
 
 export default function makeEmailRouter({ supabase }) {
   const router = express.Router();
 
-  // POST /api/send-email (mounted at /api, so route is /send-email)
+  // POST /api/send-email (email is mounted at /api, so route here is /send-email)
   router.post("/send-email", async (req, res) => {
     const { subject, body, recipients, isHtml, briefingId } = req.body;
     const sender = process.env.GMAIL_API_SENDER || "me";
 
-    // Validate request
+    // check if required fields are present body = message and recipients = array of email addresses (supplied by frontend)
     if (!body || !recipients || !Array.isArray(recipients) || recipients.length === 0) {
       return res.status(400).json({ error: "body and recipients[] required" });
     }
 
     try {
-      // Append briefing token to subject for threading
+      // Default subject if not provided
       let sendSubject = subject || "Quote Request from Quotely";
-      if (briefingId) {
-        sendSubject = `${sendSubject} [Quotely Briefing #${briefingId}]`;
-      }
 
       // Send via Gmail API
       const result = await sendEmail({
@@ -30,7 +27,8 @@ export default function makeEmailRouter({ supabase }) {
         isHtml: !!isHtml,
       });
 
-      // Persist gmail_thread_id to briefings table
+      // Persist the gmail_thread_id to the briefing in the database
+      // used when fetching thread messages in inbox
       const threadId = result?.threadId || null;
       if (threadId && supabase && briefingId) {
         try {
@@ -52,11 +50,14 @@ export default function makeEmailRouter({ supabase }) {
   });
 
   // GET /api/briefings/:briefingId/emails
+  // Fetch emails in the Gmail thread associated with the briefing
+  // used in the briefing inbox 
   router.get("/briefings/:briefingId/emails", async (req, res) => {
     const { briefingId } = req.params;
     if (!briefingId) return res.status(400).json({ error: "briefingId required" });
 
     try {
+      // Get the gmail_thread_id from the briefing
       let threadId = null;
       if (supabase) {
         try {
@@ -71,17 +72,19 @@ export default function makeEmailRouter({ supabase }) {
         }
       }
 
+      // if there is no threadId, return empty array ( no emails )
       if (!threadId) {
-        const token = `[Quotely Briefing #${briefingId}]`;
-        threadId = await findThreadIdByBriefingToken(token);
+        return res.json({ ok: true, threadId: null, emails: [] });
       }
 
-      if (!threadId) return res.json({ ok: true, emails: [] });
-
+      // fetch messages in the thread via Gmail API
       const messages = await getThreadMessages(threadId);
+      
+      // sort messages by date from oldest to newest
       messages.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-      const ownSender = (process.env.GMAIL_API_SENDER || "").toLowerCase().trim();
 
+      // filter out messages sent by own sender address (to avoid showing self-sent emails)
+      const ownSender = (process.env.GMAIL_API_SENDER || "").toLowerCase().trim();
       // If GMAIL_API_SENDER is configured, filter out messages that come from that address
       let emailsToReturn = messages || [];
       if (ownSender) {

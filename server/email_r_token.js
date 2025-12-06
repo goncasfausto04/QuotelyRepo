@@ -1,3 +1,6 @@
+// this file is a standalone script to get OAuth2 tokens for Gmail API access
+// you can run it with `node server/email_r_token.js`
+
 import express from "express";
 import open from "open";
 import { google } from "googleapis";
@@ -7,7 +10,7 @@ dotenv.config();
 
 const PORT = 3002;
 
-// Replace with the Client ID / Secret you copied, or set env vars before running
+// Gmail OAuth2 setup
 const CLIENT_ID = process.env.GMAIL_API_CLIENT_ID;
 const CLIENT_SECRET = process.env.GMAIL_API_CLIENT_SECRET;
 const REDIRECT_URI = `http://localhost:${PORT}/oauth2callback`;
