@@ -25,11 +25,11 @@ Quotely is a modern web application that helps businesses collect, analyze, and 
 - **Dark Mode Support**: Full dark/light theme with system preference detection
 - **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
 - **Multi-Language Ready**: i18n infrastructure prepared for English and Portuguese (extensible)
-- **Real-time Updates**: Live data synchronization across your devices
+- **Real-time Updates**: Live data synchronization across your devices.
 
 ### 🔐 Security & Privacy
 - **Secure Authentication**: Supabase Auth with email/password and social logins
 - **Row-Level Security**: Your quotes are private and accessible only to you
 - **Encrypted Storage**: All sensitive data encrypted at rest and in transit
 
-## https://quotely-repo.vercel.app
+## https://quotely-repo.vercel.app 
