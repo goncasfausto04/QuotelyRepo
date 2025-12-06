@@ -18,35 +18,28 @@ export default function BriefingChat({
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isConversationStarted, setIsConversationStarted] = useState(false);
-  const [conversationComplete, setConversationComplete] = useState(false);
-  // New: track whether an email has been generated (does not end the conversation)
   const [emailGenerated, setEmailGenerated] = useState(false);
-
-  // minimal email-send state (keeps legacy helper from Composer usable if called)
-  const [sendLoading, setSendLoading] = useState(false);
-  const [sendOption, setSendOption] = useState("generated"); // 'generated' | 'custom'
-  const [customEmailText, setCustomEmailText] = useState("");
-  const [recipientsText, setRecipientsText] = useState("");
 
   // Supplier search states (chat-driven)
   const [awaitingSupplierChoice, setAwaitingSupplierChoice] = useState(false); // waiting for yes/no
   const [askingLocation, setAskingLocation] = useState(false); // waiting for location text (unified name)
   const [searchingSuppliers, setSearchingSuppliers] = useState(false);
   const [supplierResults, setSupplierResults] = useState([]);
-  const [lastCollectedInfo, setLastCollectedInfo] = useState(null);
-  const [showSupplierPrompt, setShowSupplierPrompt] = useState(false); // UI/persisted prompt helper
   const [locationInput, setLocationInput] = useState("");
   // UI state for supplier-to-email action
   const [applyingSupplier, setApplyingSupplier] = useState(null);
   // ref for chat scroll container
   const chatContainerRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Add this state to store collectedInfo from email generation:
+  const [collectedInfo, setCollectedInfo] = useState(null);
 
   // Prompts for supplier flow
   const SUPPLIER_PROMPT_YESNO = {
     role: "SupplierSearchPrompt",
     content:
       "Would you like me to search for potential suppliers that match this request? Reply 'yes' or 'no'.",
-    collectedInfo: null,
     askingLocation: false,
     retryMode: false,
   };
@@ -55,7 +48,6 @@ export default function BriefingChat({
     role: "SupplierSearchPrompt",
     content:
       "Would you like to try searching again? Reply 'yes' to try again or 'no' to skip.",
-    collectedInfo: null,
     askingLocation: false,
     retryMode: true,
   };
@@ -71,6 +63,14 @@ export default function BriefingChat({
       el.scrollTop = el.scrollHeight;
     }
   }, [messages, isLoading]);
+
+  // Auto-focus input when not loading and not in special states
+  useEffect(() => {
+    // Auto-focus input when not loading and not in special states
+    if (!isLoading && !awaitingSupplierChoice && !askingLocation && !emailGenerated && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [messages, isLoading, awaitingSupplierChoice, askingLocation, emailGenerated]);
 
   // Initialize briefing from Supabase or create new one
   useEffect(() => {
@@ -89,36 +89,15 @@ export default function BriefingChat({
           const hasUserMessages = data.chat.some((msg) => msg.role === "User");
           setIsConversationStarted(hasUserMessages);
 
-          // ✅ NEW: Check if conversation is complete (email was generated)
+          // Check if conversation is complete (email was generated)
           const hasEmail = data.chat.some((msg) => msg.role === "Email");
           if (hasEmail) {
             // mark that an email exists without marking the conversation as "over"
             setEmailGenerated(true);
             console.log("✅ Loaded briefing with generated email");
-            
-            // ✅ RESTORE: find the most recent SupplierSearchPrompt anywhere in the chat
-            const lastPrompt = [...data.chat].reverse().find((m) => m.role === "SupplierSearchPrompt");
-            if (lastPrompt) {
-              setLastCollectedInfo(lastPrompt.collectedInfo || null);
-              // If prompt was asking for location, restore askingLocation state
-              if (lastPrompt.askingLocation) {
-                setAwaitingSupplierChoice(false);
-                setAskingLocation(true);
-              } else {
-                // default: show yes/no (or retry) choice
-                setAwaitingSupplierChoice(true);
-                setAskingLocation(false);
-              }
-              // If prompt marked retryMode, ensure the retry UI is available
-              if (lastPrompt.retryMode) {
-                setAwaitingSupplierChoice(true);
-                setAskingLocation(false);
-              }
-              console.log("✅ Restored supplier search prompt state from persisted prompt");
-            }
           }
 
-          // ✅ RESTORE: Load supplier results from chat messages
+          // Load supplier results from chat messages
           const supplierMessages = data.chat.filter((msg) => msg.role === "SupplierResults");
           if (supplierMessages.length > 0) {
             // Use the most recent supplier results
@@ -130,6 +109,12 @@ export default function BriefingChat({
             } catch (e) {
               console.warn("Failed to parse saved supplier results:", e);
             }
+          }
+
+          // if has email but no supplier results, show supplier prompt
+          if (hasEmail && supplierMessages.length === 0) {
+            setAwaitingSupplierChoice(true);
+            appendMessage(SUPPLIER_PROMPT_YESNO);
           }
         }
         setBriefingId(initialBriefingId);
@@ -169,78 +154,7 @@ export default function BriefingChat({
     });
   };
 
-  // If last AI message indicates the supplier search failure (substring match),
-  // surface the retry prompt and persist a SupplierSearchPrompt so it survives reloads.
-  useEffect(() => {
-    if (!messages || messages.length === 0) return;
-    const last = messages[messages.length - 1];
-    const failureMarker = "Supplier search failed:";
-    if (
-      last?.role === "AI" &&
-      typeof last?.content === "string" &&
-      last.content.includes(failureMarker)
-    ) {
-      // Show retry UI
-      setAwaitingSupplierChoice(true);
-      setAskingLocation(false);
-      setSearchingSuppliers(false);
-
-      // Ensure a SupplierSearchPrompt exists and is marked for retry
-      const hasPrompt = messages.some((m) => m.role === "SupplierSearchPrompt");
-      if (!hasPrompt) {
-        appendMessage({ ...SUPPLIER_PROMPT_RETRY, collectedInfo: lastCollectedInfo || null });
-      } else {
-        // Update existing prompt message to set retryMode = true
-        setMessages((prev) => {
-          const updated = prev.map((m) =>
-            m.role === "SupplierSearchPrompt" ? { ...m, ...SUPPLIER_PROMPT_RETRY, collectedInfo: lastCollectedInfo || null } : m
-          );
-          saveChatToSupabase(updated);
-          return updated;
-        });
-      }
-    }
-  }, [messages, lastCollectedInfo]);
-
-  // If the last persisted message is an Email, ensure the supplier yes/no prompt is shown
-  useEffect(() => {
-    if (!messages || messages.length === 0) return;
-    const last = messages[messages.length - 1];
-    if (last?.role === "Email") {
-      // If already showing prompt, nothing to do
-      if (awaitingSupplierChoice || askingLocation) {
-        setEmailGenerated(true);
-        return;
-      }
-
-      // Ensure we mark email generated
-      setEmailGenerated(true);
-      setAwaitingSupplierChoice(true);
-
-      const hasPrompt = messages.some((m) => m.role === "SupplierSearchPrompt");
-      if (!hasPrompt) {
-        // persist a prompt so it survives reloads
-        appendMessage({
-          role: "SupplierSearchPrompt",
-          content: "Supplier search prompt active",
-          collectedInfo: lastCollectedInfo || null,
-          askingLocation: false,
-          retryMode: false,
-        });
-      } else {
-        // Make sure existing prompt flags are correct (not asking location)
-        setMessages((prev) => {
-          const updated = prev.map((m) =>
-            m.role === "SupplierSearchPrompt" ? { ...m, askingLocation: false } : m
-          );
-          saveChatToSupabase(updated);
-          return updated;
-        });
-      }
-    }
-  }, [messages]);
-
-  // --- NEW: Helpers for sending email ---
+  // Helpers for sending email
   const getGeneratedEmail = () => {
     // find last message with role === 'Email'
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -249,70 +163,11 @@ export default function BriefingChat({
     return "";
   };
 
-  const sendEmailForBriefing = async () => {
-    if (sendLoading) return;
-    const body =
-      sendOption === "generated" ? getGeneratedEmail() : customEmailText || "";
-    if (!body || !body.trim()) {
-      alert("No email body to send. Choose generated or enter custom text.");
-      return;
-    }
-    const recipients = (recipientsText || "")
-      .split(",")
-      .map((r) => r.trim())
-      .filter(Boolean);
-    if (recipients.length === 0) {
-      alert("Enter at least one recipient email (comma-separated).");
-      return;
-    }
-
-    setSendLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/send-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          briefingId,
-          subject: `Quote Request from Quotely`,
-          body,
-          recipients,
-          isHtml: false,
-        }),
-      });
-
-      // Read response body regardless of status
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        // Show server error details
-        const errMsg = data.details || data.error || `Status ${res.status}`;
-        throw new Error(errMsg);
-      }
-
-      appendMessage({
-        role: "AI",
-        content: `✅ Email sent to ${recipients.join(", ")}.`,
-      });
-
-      if (data?.threadId) {
-        console.log("Gmail threadId:", data.threadId);
-      }
-    } catch (err) {
-      console.error("Send email error:", err);
-      appendMessage({
-        role: "AI",
-        content: `❌ Failed to send email: ${err.message || String(err)}`,
-      });
-    } finally {
-      setSendLoading(false);
-    }
-  };
-
   // Main message sending function
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
-    // ✅ BLOCK: If email was generated, only allow supplier search interactions
+    // If email was generated, only allow supplier search interactions
     if (emailGenerated && !awaitingSupplierChoice && !askingLocation && !searchingSuppliers) {
       appendMessage({ role: "User", content: input.trim() });
       setInput("");
@@ -416,6 +271,9 @@ export default function BriefingChat({
       // CASE 2A: Conversation is complete - generate email THEN prompt for supplier search
       if (data.done) {
         console.log("Conversation complete! Generating email...");
+        
+        // ✅ SAVE collectedInfo for later use in supplier search
+        setCollectedInfo(data.collectedInfo);
 
         // Generate the email now
         appendMessage({
@@ -447,6 +305,14 @@ export default function BriefingChat({
             content: emailPayload.email,
             isEmail: true,
           });
+
+          if (typeof onEmailGenerated === "function") {
+            try {
+              onEmailGenerated(emailPayload.email, data.collectedInfo);
+            } catch (e) {
+              console.warn("onEmailGenerated error:", e);
+            }
+          }
         } catch (err) {
           console.error("Email generation failed:", err);
           appendMessage({
@@ -455,16 +321,20 @@ export default function BriefingChat({
           });
         }
 
-        // mark that an email has been generated (conversation remains open)
+        // mark that an email has been generated (conversation remains open for supplier search only)
         setEmailGenerated(true);
-        setLastCollectedInfo(data.collectedInfo);
         // Show the supplier choice buttons and save state to chat
         setAwaitingSupplierChoice(true);
         
-        // ✅ SAVE: Persist supplier search prompt state to chat
+        // ✅ UPDATE database flag
+        await supabase
+          .from("briefings")
+          .update({ conversation_finished: true })
+          .eq("id", briefingId);
+
+        // Persist supplier search prompt state to chat
         appendMessage({
           ...SUPPLIER_PROMPT_YESNO,
-          collectedInfo: data.collectedInfo,
           // This message won't be visible in the UI - it's just for state persistence
         });
       }
@@ -502,16 +372,20 @@ export default function BriefingChat({
 
   // Reset conversation to start over
   const resetConversation = () => {
+    // ✅ UPDATE database flag when resetting
+    supabase
+      .from("briefings")
+      .update({ conversation_finished: false })
+      .eq("id", briefingId);
+
     setIsConversationStarted(false);
-    setConversationComplete(false);
     setEmailGenerated(false);
+    setCollectedInfo(null);
     // ✅ RESET: Clear supplier search states
     setAwaitingSupplierChoice(false);
     setAskingLocation(false);
     setSearchingSuppliers(false);
     setSupplierResults([]);
-    setLastCollectedInfo(null);
-    setShowSupplierPrompt(false);
     // Clear any persisted search retry state
     setMessages((prev) => {
       const updated = prev.filter(msg => msg.role !== "SupplierSearchPrompt");
@@ -534,11 +408,10 @@ export default function BriefingChat({
     ]);
   };
 
-  // --- NEW: Supplier search handling ---
-  // (duplicate declarations removed — states are declared above)
-
   // Apply selected supplier to the most recent generated Email message.
   // This will prepend a "To: Name <email>" header and try to personalise the greeting.
+
+  // not used for now since we are auto sending to quotely but wll be used later
   const applySupplierToEmail = (supplier) => {
     if (!supplier) return;
     // find last Email message index
@@ -596,7 +469,7 @@ export default function BriefingChat({
     setTimeout(() => setApplyingSupplier(null), 800);
   };
 
-  // NEW: send the generated email (with optional supplier metadata) to a fixed inbox
+  // send the generated email to a fixed inbox
   const sendGeneratedEmailToQuotely = async (supplier) => {
     if (!briefingId) {
       alert("Briefing not initialized");
@@ -647,177 +520,133 @@ export default function BriefingChat({
     }
   };
 
-  // --- NEW: handle supplier search
-  const handleSupplierSearch = async (choice, locationInputFromUser = null, collectedInfoOverride = null) => {
+  // handle supplier search
+  const handleSupplierSearch = async (choice, locationInputFromUser = null) => {
     // choice: "yes" | "no" | "location-submitted"
-    setShowSupplierPrompt(true);
 
-    // Use explicit override first, otherwise try lastCollectedInfo.
-    // If neither exists, let the server reconstruct from briefingId (don't build a local fallback)
-    let effectiveCollectedInfo = collectedInfoOverride || lastCollectedInfo || null;
-
-    // If we have no collectedInfo yet, persist a prompt so state survives reloads
-    if (!effectiveCollectedInfo) {
-      setMessages((prev) => {
-        const hasPrompt = prev.some((m) => m.role === "SupplierSearchPrompt");
-        if (!hasPrompt) {
-          const updated = [...prev, { ...SUPPLIER_PROMPT_YESNO, collectedInfo: null }];
-          saveChatToSupabase(updated);
-          return updated;
-        }
-        return prev;
-      });
-    }
-
-    // user declined
     if (choice === "no") {
       appendMessage({ role: "AI", content: "Okay — not searching for suppliers right now." });
       setAwaitingSupplierChoice(false);
       setAskingLocation(false);
-      setLastCollectedInfo(null);
-      // remove persisted prompt
-      setMessages((prev) => {
-        const updated = prev.filter((msg) => msg.role !== "SupplierSearchPrompt");
-        saveChatToSupabase(updated);
-        return updated;
-      });
       return;
     }
 
-    // ask for location if needed (don't ask for location when caller explicitly passed collectedInfoOverride)
-    const forceSearch = !!collectedInfoOverride;
-    if (choice === "yes" && !effectiveCollectedInfo.location && !locationInputFromUser && !forceSearch) {
+    // If user said "yes" but hasn't provided location yet, ask for it
+    if (choice === "yes" && !locationInputFromUser) {
       appendMessage({
         role: "AI",
         content: "Where should I look for suppliers? Please provide a city, region, or postal code (or type 'any').",
       });
       setAwaitingSupplierChoice(false);
       setAskingLocation(true);
-      setMessages((prev) => {
-        const updated = prev.map((msg) =>
-          msg.role === "SupplierSearchPrompt" ? { ...msg, content: "Asking for location", askingLocation: true } : msg
-        );
-        saveChatToSupabase(updated);
-        return updated;
-      });
       return;
     }
 
-    const location = locationInputFromUser || effectiveCollectedInfo.location || null;
+    // Now we have location, proceed with search
+    const location = locationInputFromUser || "any";
     setSearchingSuppliers(true);
+    setAwaitingSupplierChoice(false);
+    setAskingLocation(false);
+
     try {
-      appendMessage({ role: "AI", content: `🔎 Searching for suppliers${location ? ` near ${location}` : ""}...` });
+      appendMessage({ 
+        role: "AI", 
+        content: `🔎 Searching for suppliers${location !== "any" ? ` near ${location}` : ""}...` 
+      });
 
-      const payloadBody = { collectedInfo: effectiveCollectedInfo };
-      if (location) payloadBody.location = location;
-      // include briefingId so server can reconstruct if needed
-      payloadBody.briefingId = briefingId;
+      // ✅ Use saved collectedInfo from email generation, or reconstruct from chat
+      let effectiveCollectedInfo = collectedInfo;
+      
+      // If no collectedInfo, fetch conversation_state from database
+      if (!effectiveCollectedInfo) {
+        console.log("📂 Fetching conversation_state from database...");
+        
+        const { data, error } = await supabase
+          .from("briefings")
+          .select("conversation_state")
+          .eq("id", briefingId)
+          .single();
 
+        if (error || !data?.conversation_state) {
+          throw new Error("No briefing data available. Please complete the conversation first.");
+        }
+
+        effectiveCollectedInfo = {
+          description: data.conversation_state.description,
+          conversationHistory: data.conversation_state.history,
+        };
+
+        console.log("✅ Loaded conversation_state from database");
+      }
+
+      if (!effectiveCollectedInfo?.description) {
+        throw new Error("No briefing data available");
+      }
+
+      // ✅ NOW search suppliers with collectedInfo
       const res = await fetch(`${API_URL}/search-suppliers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payloadBody),
+        body: JSON.stringify({
+          briefingId,
+          collectedInfo: effectiveCollectedInfo,
+          location: location !== "any" ? location : "",
+        }),
       });
 
-      const payload = await res.json().catch(() => ({}));
-      // server returns { suppliers: [...], queries: [...] }
-      const results = Array.isArray(payload.suppliers) ? payload.suppliers : [];
-      const queries = Array.isArray(payload.queries) ? payload.queries : [];
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      // Normalize results into the UI supplier object shape
-      const mapped = results.map((r) => {
-        // r may be an AI-synth object or a Searx hit { query, title, url, content }
-        const name =
-          r.name ||
-          r.title ||
-          (r.query ? `${r.query}` : null) ||
-          null;
-        const website = r.website || r.url || r.link || null;
-        const contact_email = r.contact_email || r.email || null;
-        const phone = r.phone || null;
-        const note = r.note || r.content || (r.query ? `Matched by query: ${r.query}` : "");
-        return {
-          name,
-          contact_email,
-          phone,
-          website,
-          note,
-          // preserve raw for debugging
-          __raw: r,
-        };
-      }).filter((s) => s.name || s.contact_email || s.website || s.phone || s.note);
+      const payload = await res.json();
+      const results = Array.isArray(payload.suppliers) ? payload.suppliers : [];
+
+      // Normalize results
+      const mapped = results
+        .map((r) => ({
+          name: r.name || r.title || null,
+          contact_email: r.contact_email || r.email || null,
+          phone: r.phone || null,
+          website: r.website || r.url || r.link || null,
+          note: r.note || r.content || "",
+        }))
+        .filter((s) => s.name || s.contact_email || s.website || s.phone);
 
       if (mapped.length === 0) {
-        // Ensure we keep collectedInfo so the Yes button can retry without forcing a location prompt.
-        setLastCollectedInfo(effectiveCollectedInfo);
-
-        appendMessage({ role: "AI", content: "❌ No suppliers found matching your request." });
+        appendMessage({ 
+          role: "AI", 
+          content: "❌ No suppliers found. Would you like to try again with different criteria?" 
+        });
         setAwaitingSupplierChoice(true);
-        setAskingLocation(false);
-        setMessages((prev) => {
-          // set or append the retry prompt using the canonical constant
-          const updated = prev.map((m) =>
-            m.role === "SupplierSearchPrompt" ? { ...m, ...SUPPLIER_PROMPT_RETRY, collectedInfo: effectiveCollectedInfo } : m
-          );
-          if (!updated.some((m) => m.role === "SupplierSearchPrompt")) {
-            updated.push({ ...SUPPLIER_PROMPT_RETRY, collectedInfo: effectiveCollectedInfo });
-          }
-          saveChatToSupabase(updated);
-          return updated;
-        });
-      } else {
-        appendMessage({ role: "AI", content: `✅ Found ${mapped.length} potential suppliers:` });
-        setSupplierResults(mapped);
+        return;
+      }
 
-        // persist supplier results so they survive reloads
-        appendMessage({
-          role: "SupplierResults",
-          content: JSON.stringify(mapped),
-        });
+      appendMessage({ 
+        role: "AI", 
+        content: `✅ Found ${mapped.length} potential suppliers:` 
+      });
+      setSupplierResults(mapped);
 
-        if (typeof onSuppliersFound === "function") {
-          try {
-            onSuppliersFound(mapped);
-          } catch (e) {
-            console.warn("onSuppliersFound handler error:", e);
-          }
+      // Persist supplier results for reloads
+      appendMessage({
+        role: "SupplierResults",
+        content: JSON.stringify(mapped),
+      });
+
+      if (typeof onSuppliersFound === "function") {
+        try {
+          onSuppliersFound(mapped);
+        } catch (e) {
+          console.warn("onSuppliersFound error:", e);
         }
-
-        // clear persisted prompt on success
-        setMessages((prev) => {
-          const updated = prev.filter((msg) => msg.role !== "SupplierSearchPrompt");
-          saveChatToSupabase(updated);
-          return updated;
-        });
       }
     } catch (err) {
       console.error("Supplier search failed:", err);
-      // Keep collectedInfo so retrying uses same context
-      setLastCollectedInfo(effectiveCollectedInfo);
-
-      appendMessage({ role: "AI", content: `❌ Supplier search failed: ${err.message || String(err)}` });
-      // persist retry state
-      setMessages((prev) => {
-        const updated = prev.map((m) =>
-          m.role === "SupplierSearchPrompt" ? { ...m, content: "Search failed - retry available", retryMode: true, askingLocation: false, collectedInfo: effectiveCollectedInfo } : m
-        );
-        if (!updated.some((m) => m.role === "SupplierSearchPrompt")) {
-          updated.push({
-            role: "SupplierSearchPrompt",
-            content: "Search failed - retry available",
-            collectedInfo: effectiveCollectedInfo,
-            retryMode: true,
-            askingLocation: false,
-          });
-        }
-        saveChatToSupabase(updated);
-        return updated;
+      appendMessage({ 
+        role: "AI", 
+        content: `❌ Search failed: ${err.message}. Try again?` 
       });
+      setAwaitingSupplierChoice(true);
     } finally {
       setSearchingSuppliers(false);
-      setAskingLocation(false);
-      setAwaitingSupplierChoice(false);
-      // don't clear lastCollectedInfo here; keep it so the user can click "Yes" to retry
     }
   };
 
@@ -836,7 +665,14 @@ export default function BriefingChat({
         className="mb-4 h-64 sm:h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded p-4 bg-gray-50 dark:bg-gray-900"
       >
         {messages
-          .filter((msg) => msg.role !== "SupplierResults" && msg.role !== "SupplierSearchPrompt") // Remove hidden state messages
+          .filter((msg) => {
+            // Always hide SupplierResults (they're shown as cards below)
+            if (msg.role === "SupplierResults") return false;
+            // Hide SupplierSearchPrompt UNLESS we're actively waiting for a choice
+            // (this keeps the state but makes it invisible until needed)
+            if (msg.role === "SupplierSearchPrompt") return false;
+            return true;
+          })
           .map((msg, idx) => (
           <div
             key={idx}
@@ -867,72 +703,68 @@ export default function BriefingChat({
           </div>
           ))}
 
-        {/* Render supplier results as small cards with "Apply to Email" action */}
+        {/* Render supplier results as small cards with "Send" action */}
         {supplierResults && supplierResults.length > 0 && (
-          <div className="mt-4 flex flex-col gap-3">
-            {/* Search Again button at the top of supplier results */}
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Found {supplierResults.length} supplier{supplierResults.length !== 1 ? 's' : ''}:
+          <div className="mt-4 flex flex-col gap-2">
+            {/* Header with Search Again button */}
+            <div className="flex justify-between items-center mb-3 px-1">
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                ✅ Found {supplierResults.length} supplier{supplierResults.length !== 1 ? 's' : ''}
               </span>
               <button
                 onClick={() => {
-                  // Build a collectedInfo object synchronously and pass it to the handler
-                  const fallbackCollected = lastCollectedInfo || {
-                    description: messages.find((m) => m.role === "User")?.content || "",
-                    conversationHistory: messages
-                      .filter((m) => m.role === "AI" || m.role === "User")
-                      .map((m) => ({ role: m.role === "User" ? "user" : "assistant", content: m.content })),
-                  };
-
-                  // Clear UI results and persist a prompt state
                   setSupplierResults([]);
                   setAwaitingSupplierChoice(true);
-                  setLastCollectedInfo(fallbackCollected);
-                  // persist canonical retry prompt
-                  appendMessage({ ...SUPPLIER_PROMPT_RETRY, collectedInfo: fallbackCollected });
-
-                  // Immediately trigger the search using the constructed collectedInfo so it doesn't rely on async state updates
-                  handleSupplierSearch("yes", null, fallbackCollected);
+                  appendMessage({ ...SUPPLIER_PROMPT_RETRY });
+                  handleSupplierSearch("yes");
                 }}
                 disabled={searchingSuppliers || awaitingSupplierChoice}
-                className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Search for different suppliers"
+                className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
                 🔍 Search Again
               </button>
             </div>
 
-            {supplierResults.map((s, i) => {
-              return (
-                <div
-                  key={i}
-                  className="w-full p-3 rounded-lg border bg-white dark:bg-gray-800 dark:border-gray-700"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-medium text-sm text-gray-900 dark:text-white break-words">
-                        {s.name || "Unnamed"}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 break-words">
-                        {s.contact_email}
-                      </div>
-                    </div>
-
-                    <div className="flex-shrink-0">
-                      <button
-                        onClick={() => sendGeneratedEmailToQuotely(s)}
-                        className="px-3 py-1 rounded bg-green-600 text-white text-sm hover:bg-green-700"
-                        disabled={applyingSupplier !== null}
-                        title="Send generated email to quotelybriefings@gmail.com"
-                      >
-                        {applyingSupplier === (s.contact_email || s.name) ? "Sending..." : "Send"}
-                      </button>
-                    </div>
-                  </div>
+            {/* Supplier cards - vertical boxes */}
+            {supplierResults.map((s, i) => (
+              <div
+                key={i}
+                className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-750 hover:shadow-md transition-shadow"
+              >
+                {/* Supplier name */}
+                <div className="font-semibold text-gray-900 dark:text-white text-sm mb-2">
+                  {s.name || "Unnamed Supplier"}
                 </div>
-              );
-            })}
+
+                {/* Email and Send button in one row */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs text-gray-600 dark:text-gray-400 break-words flex-1">
+                    {s.contact_email || "No email"}
+                  </div>
+                  <button
+                    onClick={() => sendGeneratedEmailToQuotely(s)}
+                    disabled={applyingSupplier !== null}
+                    className={`px-4 py-2 text-sm rounded font-medium whitespace-nowrap flex-shrink-0 transition-colors ${
+                      applyingSupplier === (s.contact_email || s.name)
+                        ? "bg-green-700 text-white cursor-wait"
+                        : "bg-green-600 text-white hover:bg-green-700"
+                    } ${applyingSupplier !== null ? "opacity-50 cursor-not-allowed" : ""}`}
+                    title="Send generated email to quotelybriefings@gmail.com"
+                  >
+                    {applyingSupplier === (s.contact_email || s.name) ? "Sending..." : "Send"}
+                  </button>
+                </div>
+
+                {/* Optional: show note or phone if available */}
+                {(s.note || s.phone || s.website) && (
+                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    {s.note && <div>{s.note}</div>}
+                    {s.phone && <div>📞 {s.phone}</div>}
+                    {s.website && <div>🌐 {s.website}</div>}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
@@ -956,13 +788,13 @@ export default function BriefingChat({
           </div>
         )}
 
-        {/* YES/NO buttons for supplier search prompt */}
+        {/* YES/NO buttons for supplier search prompt - ALWAYS SHOW when awaiting choice */}
         {awaitingSupplierChoice && (
           <div className="my-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700">
             <p className="text-blue-900 dark:text-blue-100 mb-3 font-medium">
-              {/* Show different message if this is a retry vs initial search */}
+              {/* Check if we have a retry prompt persisted */}
               {messages.some(m => m.role === "SupplierSearchPrompt" && m.retryMode)
-                ? "Would you like to try searching for suppliers again? You can try a different location or search approach."
+                ? "Would you like to try searching for suppliers again with different criteria?"
                 : "Would you like me to search for potential suppliers that match this request?"
               }
             </p>
@@ -972,10 +804,7 @@ export default function BriefingChat({
                 disabled={searchingSuppliers}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
-                {messages.some(m => m.role === "SupplierSearchPrompt" && m.retryMode)
-                  ? "Yes, try again"
-                  : "Yes, find suppliers"
-                }
+                Yes, search
               </button>
               <button
                 onClick={() => handleSupplierSearch("no")}
@@ -1040,6 +869,7 @@ export default function BriefingChat({
 
       <div className="flex flex-col sm:flex-row gap-2">
         <input
+          ref={inputRef}
           className="w-full sm:flex-1 border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-3 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none mb-2 sm:mb-0"
           type="text"
           value={input}
@@ -1048,27 +878,28 @@ export default function BriefingChat({
           placeholder={
             isLoading
               ? "Please wait..."
+              : emailGenerated
+              ? "Conversation complete. Use 'Start New Request' to begin again."
               : !isConversationStarted
               ? "e.g., I need 100 custom t-shirts with my logo"
               : awaitingSupplierChoice
               ? "Use the buttons above to choose supplier search"
               : askingLocation
               ? "Enter location for supplier search..."
-              : emailGenerated
-              ? "Email generated! You can continue the conversation or start a new request"
               : "Type your answer..."
           }
-          // disable while loading or waiting for button choice
-          disabled={isLoading || awaitingSupplierChoice || askingLocation}
+          // not allow input when loading, email generated, or in supplier choice flow
+          disabled={isLoading || emailGenerated || awaitingSupplierChoice || askingLocation}
         />
         <button
           className={`w-full sm:w-auto px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors ${
-            isLoading || !input.trim() || awaitingSupplierChoice || askingLocation
+            isLoading || !input.trim() || emailGenerated || awaitingSupplierChoice || askingLocation
               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
               : "bg-blue-600 text-white hover:bg-blue-700"
            }`}
            onClick={sendMessage}
-           disabled={isLoading || !input.trim() || awaitingSupplierChoice || askingLocation}
+           // ✅ KEEP !input.trim() here — only disable Send button if input is empty
+           disabled={isLoading || !input.trim() || emailGenerated || awaitingSupplierChoice || askingLocation}
          >
            {isLoading ? "..." : "Send"}
          </button>
