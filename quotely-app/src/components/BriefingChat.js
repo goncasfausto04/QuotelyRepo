@@ -736,10 +736,18 @@ export default function BriefingChat({
                   {s.name || "Unnamed Supplier"}
                 </div>
 
-                {/* Email and Send button in one row */}
+                {/* Email/Website and Send button in one row */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-xs text-gray-600 dark:text-gray-400 break-words flex-1">
-                    {s.contact_email || "No email"}
+                    {s.contact_email ? (
+                      s.contact_email
+                    ) : s.website ? (
+                      <a href={s.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        {s.website}
+                      </a>
+                    ) : (
+                      "No contact info"
+                    )}
                   </div>
                   <button
                     onClick={() => sendGeneratedEmailToQuotely(s)}
@@ -756,11 +764,10 @@ export default function BriefingChat({
                 </div>
 
                 {/* Optional: show note or phone if available */}
-                {(s.note || s.phone || s.website) && (
+                {(s.note || s.phone) && (
                   <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     {s.note && <div>{s.note}</div>}
                     {s.phone && <div>📞 {s.phone}</div>}
-                    {s.website && <div>🌐 {s.website}</div>}
                   </div>
                 )}
               </div>

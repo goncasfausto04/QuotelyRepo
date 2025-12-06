@@ -12,6 +12,7 @@ import makeEmailRouter from "./routes/email.js";
 import makeConversationRouter from "./routes/conversation.js";
 import makeAnalyzeRouter from "./routes/analyze.js";
 import makeSupplierRouter from "./routes/supplier.js";
+import makeSearchRouter from "./routes/search.js";
 
 dotenv.config();
 console.log("🔍 FRONTEND_URL:", process.env.FRONTEND_URL);
@@ -166,6 +167,10 @@ const conversationRouter = makeConversationRouter({
   supabase,
 });
 app.use("/", conversationRouter);
+
+// Mount search router
+const searchRouter = makeSearchRouter({ ai, retryWithBackoff });
+app.use("/api", searchRouter);
 
 // mount supplier routes (generate link, public briefing and submit quote)
 const supplierRouter = makeSupplierRouter({ supabase, randomBytes });
