@@ -584,7 +584,7 @@ export default function BriefingChat({
       }
 
       // ✅ NOW search suppliers with collectedInfo
-      const res = await fetch(`${API_URL}/search-suppliers`, {
+      const res = await fetch(`${API_URL}/api/search-suppliers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -729,10 +729,10 @@ export default function BriefingChat({
             {supplierResults.map((s, i) => (
               <div
                 key={i}
-                className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-750 hover:shadow-md transition-shadow"
+                className="w-full p-3 rounded-lg border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-gray-700 transition-shadow"
               >
                 {/* Supplier name */}
-                <div className="font-semibold text-gray-900 dark:text-white text-sm mb-2">
+                <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm mb-2">
                   {s.name || "Unnamed Supplier"}
                 </div>
 
@@ -742,7 +742,12 @@ export default function BriefingChat({
                     {s.contact_email ? (
                       s.contact_email
                     ) : s.website ? (
-                      <a href={s.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      <a 
+                        href={s.website} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-blue-600 dark:text-blue-400 hover:underline"
+                      >
                         {s.website}
                       </a>
                     ) : (
@@ -754,8 +759,8 @@ export default function BriefingChat({
                     disabled={applyingSupplier !== null}
                     className={`px-4 py-2 text-sm rounded font-medium whitespace-nowrap flex-shrink-0 transition-colors ${
                       applyingSupplier === (s.contact_email || s.name)
-                        ? "bg-green-700 text-white cursor-wait"
-                        : "bg-green-600 text-white hover:bg-green-700"
+                        ? "bg-green-700 dark:bg-green-600 text-white cursor-wait"
+                        : "bg-green-600 dark:bg-green-700 text-white hover:bg-green-700 dark:hover:bg-green-600"
                     } ${applyingSupplier !== null ? "opacity-50 cursor-not-allowed" : ""}`}
                     title="Send generated email to quotelybriefings@gmail.com"
                   >
