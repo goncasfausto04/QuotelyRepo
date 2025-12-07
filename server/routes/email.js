@@ -33,6 +33,7 @@ export default function makeEmailRouter({ supabase }) {
       if (threadId && supabase && briefingId) {
         try {
           await supabase
+          
             .from("briefings")
             .update({ gmail_thread_id: threadId })
             .eq("id", briefingId);

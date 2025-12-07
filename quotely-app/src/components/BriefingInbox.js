@@ -28,7 +28,7 @@ export default function BriefingInbox({ briefingId }) {
   const [sendingReply, setSendingReply] = useState(false);
   const [generatedEmail, setGeneratedEmail] = useState(""); // generated email text
 
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
+  const API_URL = process.env.REACT_APP_API_URL;
 
   // Fetch emails for this briefing
   const fetchEmails = useCallback(async () => {

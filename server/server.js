@@ -147,6 +147,9 @@ const ai = new GoogleGenAI({
 });
 console.log("✅ Google AI client initialized");
 
+const emailRouter = makeEmailRouter({ supabase, retryWithBackoff });
+app.use("/api", emailRouter);
+
 const analyzeRouter = makeAnalyzeRouter({
   ai,
   retryWithBackoff,
@@ -175,9 +178,6 @@ app.use("/api", searchRouter);
 // mount supplier routes (generate link, public briefing and submit quote)
 const supplierRouter = makeSupplierRouter({ supabase, randomBytes });
 app.use("/api", supplierRouter);
-
-// mount email routes with a service-role (admin) Supabase client so routes can read/update briefings.gmail_thread_id
-app.use("/api", makeEmailRouter({ supabase }));
 
 // Health check
 app.get("/", (req, res) => {
