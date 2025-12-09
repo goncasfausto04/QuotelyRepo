@@ -1,3 +1,5 @@
+// fetch and display briefing email inbox
+
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../supabaseClient.js";
 import {
@@ -13,19 +15,20 @@ import {
   Send,
   AlertCircle,
 } from "lucide-react";
-import BriefingEmailComposer from "./BriefingEmailComposer.js";
+import BriefingEmailComposer from "./BriefingEmailComposer.js"; // email composer component
 
 export default function BriefingInbox({ briefingId }) {
-  const [emails, setEmails] = useState([]);
+  const [emails, setEmails] = useState([]); // list of emails
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [expandedEmail, setExpandedEmail] = useState(null);
-  const [replyingTo, setReplyingTo] = useState(null);
-  const [replyText, setReplyText] = useState("");
+  const [expandedEmail, setExpandedEmail] = useState(null); // which email is expanded
+  const [replyingTo, setReplyingTo] = useState(null); // which email is being replied to
+  const [replyText, setReplyText] = useState(""); // reply message text
   const [sendingReply, setSendingReply] = useState(false);
+  const [generatedEmail, setGeneratedEmail] = useState(""); // generated email text
 
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
+  const API_URL = process.env.REACT_APP_API_URL;
 
   // Fetch emails for this briefing
   const fetchEmails = useCallback(async () => {
@@ -44,6 +47,7 @@ export default function BriefingInbox({ briefingId }) {
         .select("*")
         .eq("briefing_id", briefingId);
 
+      // Map message_id to status
       const statusMap = {};
       (statusData || []).forEach((s) => {
         statusMap[s.message_id] = s;
@@ -52,7 +56,7 @@ export default function BriefingInbox({ briefingId }) {
       // Merge status with emails
       const emailsWithStatus = (data.emails || []).map((email) => ({
         ...email,
-        status: statusMap[email.id]?.status || "pending",
+        status: statusMap[email.id]?.status || "pending", // default to pending
         notes: statusMap[email.id]?.notes || "",
       }));
 
@@ -61,6 +65,7 @@ export default function BriefingInbox({ briefingId }) {
         (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
       );
 
+      // Update state with emails including status (show emails and statusin view)
       setEmails(emailsWithStatus);
     } catch (err) {
       console.error("Error fetching emails:", err);
@@ -69,17 +74,20 @@ export default function BriefingInbox({ briefingId }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [briefingId, API_URL]);
+  }, [briefingId, API_URL]); // Add briefingId and API_URL to dependencies
 
+  // Initial fetch
   useEffect(() => {
     fetchEmails();
   }, [fetchEmails]);
 
+  // Refresh emails
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchEmails();
   };
 
+  // Update email status (approved/rejected)
   const updateEmailStatus = async (messageId, status) => {
     try {
       const { error: upsertError } = await supabase
@@ -96,7 +104,7 @@ export default function BriefingInbox({ briefingId }) {
 
       if (upsertError) throw upsertError;
 
-      // Update local state
+      // update state to reflect status change
       setEmails((prev) =>
         prev.map((email) =>
           email.id === messageId ? { ...email, status } : email
@@ -108,15 +116,18 @@ export default function BriefingInbox({ briefingId }) {
     }
   };
 
+  // for status updates
   const handleApprove = (messageId) => updateEmailStatus(messageId, "approved");
   const handleReject = (messageId) => updateEmailStatus(messageId, "rejected");
 
+  // Reply to email
   const handleReply = async (email) => {
     if (!replyText.trim()) {
       alert("Please enter a reply message");
       return;
     }
 
+    // send reply via API
     setSendingReply(true);
     try {
       const res = await fetch(`${API_URL}/api/send-email`, {
@@ -140,8 +151,6 @@ export default function BriefingInbox({ briefingId }) {
       setReplyingTo(null);
       setReplyText("");
       
-      // Refresh to get the sent reply in the thread
-      await fetchEmails();
     } catch (err) {
       console.error("Error sending reply:", err);
       alert(`Failed to send reply: ${err.message}`);
@@ -150,6 +159,7 @@ export default function BriefingInbox({ briefingId }) {
     }
   };
 
+  // Toggle expand/collapse email
   const toggleExpand = (emailId) => {
     setExpandedEmail(expandedEmail === emailId ? null : emailId);
     if (replyingTo === emailId) {
@@ -158,11 +168,13 @@ export default function BriefingInbox({ briefingId }) {
     }
   };
 
+  // Toggle reply input
   const toggleReply = (emailId) => {
     setReplyingTo(replyingTo === emailId ? null : emailId);
     setReplyText("");
   };
 
+  // Get status badge component (approved/rejected/pending icons)
   const getStatusBadge = (status) => {
     switch (status) {
       case "approved":
@@ -186,14 +198,13 @@ export default function BriefingInbox({ briefingId }) {
     }
   };
 
+  // send replies to analysis at analyze endpoint when approve is clicked
   // approve -> analyze -> insert quote -> mark approved
   const approveAndAnalyze = async (email) => {
     if (!email || !briefingId) return;
     setRefreshing(true);
     try {
-      // mark approved locally/UI first
-      await updateEmailStatus(email.id, "approved");
-
+  
       // call server analyze endpoint
       const res = await fetch(`${API_URL}/api/analyze-email`, {
         method: "POST",
@@ -206,7 +217,7 @@ export default function BriefingInbox({ briefingId }) {
         throw new Error(data.details || data.error || `Status ${res.status}`);
       }
 
-      // parse analysis (server returns analysis as JSON string or object)
+      // parse analysis we get back (server returns analysis as JSON string or object)
       let analysis = data.analysis || null;
       if (typeof analysis === "string") {
         try {
@@ -237,6 +248,9 @@ export default function BriefingInbox({ briefingId }) {
         throw insertErr;
       }
 
+      // mark approved since analyze succeeded
+      await handleApprove(email.id);
+
       // refresh inbox and quotes UI
       await fetchEmails();
     } catch (err) {
@@ -250,9 +264,10 @@ export default function BriefingInbox({ briefingId }) {
   // delete rejected email status (permanent remove from statuses)
   const deleteRejected = async (messageId) => {
     if (!messageId || !briefingId) return;
-    // eslint-disable-next-line no-alert
+    // confirm deletion
     if (!window.confirm("Permanently delete this rejected email from inbox records?")) return;
     try {
+      // delete from email_statuses table in database ( it has the emails, not removed from gmail inbox )
       const { error: delErr } = await supabase
         .from("email_statuses")
         .delete()
@@ -269,12 +284,42 @@ export default function BriefingInbox({ briefingId }) {
   };
 
   const handleComposerSent = (recipients) => {
-    // Refresh inbox after sending and give minimal feedback
+    // Refresh inbox after sending
     fetchEmails();
     if (recipients && recipients.length) {
       alert(`Email sent to: ${recipients.join(", ")}`);
     }
   };
+
+  // Load generated email from chat messages to pass to composer component
+  const loadGeneratedEmail = useCallback(async () => {
+    if (!briefingId) return;
+    try {
+      const { data, error } = await supabase
+        .from("briefings")
+        .select("chat")
+        .eq("id", briefingId)
+        .single();
+      
+      if (!error && data?.chat) {
+        // Find the last email message in chat
+        const emailMessage = [...data.chat]
+          .reverse()
+          .find(msg => msg.role === "Email" && msg.isEmail);
+        
+        if (emailMessage?.content) {
+          setGeneratedEmail(emailMessage.content);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load generated email:", err);
+    }
+  }, [briefingId]); // so it only fetches when briefingId changes
+
+  // set generated email when loaded
+  useEffect(() => {
+    loadGeneratedEmail();
+  }, [loadGeneratedEmail]);
 
   if (loading) {
     return (
@@ -500,7 +545,7 @@ export default function BriefingInbox({ briefingId }) {
       <div className="mt-6">
         <BriefingEmailComposer
           briefingId={briefingId}
-          // Not providing getGeneratedEmail here - composer still supports custom text.
+          getGeneratedEmail={() => generatedEmail}
           onSent={handleComposerSent}
         />
       </div>

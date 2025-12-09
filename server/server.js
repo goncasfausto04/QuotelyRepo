@@ -5,12 +5,14 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import { randomBytes } from "crypto";
+import { LinkupClient } from 'linkup-sdk';
 
 // Import route handlers
 import makeEmailRouter from "./routes/email.js";
 import makeConversationRouter from "./routes/conversation.js";
 import makeAnalyzeRouter from "./routes/analyze.js";
 import makeSupplierRouter from "./routes/supplier.js";
+import makeSearchRouter from "./routes/search.js";
 
 dotenv.config();
 console.log("🔍 FRONTEND_URL:", process.env.FRONTEND_URL);
@@ -145,6 +147,9 @@ const ai = new GoogleGenAI({
 });
 console.log("✅ Google AI client initialized");
 
+const emailRouter = makeEmailRouter({ supabase, retryWithBackoff });
+app.use("/api", emailRouter);
+
 const analyzeRouter = makeAnalyzeRouter({
   ai,
   retryWithBackoff,
@@ -166,12 +171,13 @@ const conversationRouter = makeConversationRouter({
 });
 app.use("/", conversationRouter);
 
+// Mount search router
+const searchRouter = makeSearchRouter({ ai, retryWithBackoff });
+app.use("/api", searchRouter);
+
 // mount supplier routes (generate link, public briefing and submit quote)
 const supplierRouter = makeSupplierRouter({ supabase, randomBytes });
 app.use("/api", supplierRouter);
-
-// mount email routes with a service-role (admin) Supabase client so routes can read/update briefings.gmail_thread_id
-app.use("/api", makeEmailRouter({ supabase }));
 
 // Health check
 app.get("/", (req, res) => {

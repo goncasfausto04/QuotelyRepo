@@ -1,74 +1,14 @@
+// this file has both the function to send emails via Gmail API
+// and to fetch messages in a thread
+// these are used in server/routes/email.js
+
 import dotenv from "dotenv";
 import { google } from "googleapis";
 
+// Load environment variables
 dotenv.config();
 
-/**
- * Send an email using Gmail API (OAuth2 refresh token).
- * @param {{from:string, to:string|string[], subject?:string, body?:string, isHtml?:boolean}} opts
- */
-export async function sendEmail({ from, to, subject = "", body = "", isHtml = false }) {
-  const CLIENT_ID = process.env.GMAIL_API_CLIENT_ID;
-  const CLIENT_SECRET = process.env.GMAIL_API_CLIENT_SECRET;
-  const REFRESH_TOKEN = process.env.GMAIL_API_REFRESH_TOKEN;
-
-  if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
-    throw new Error(
-      "Missing Gmail OAuth env vars (GMAIL_API_CLIENT_ID, GMAIL_API_CLIENT_SECRET, GMAIL_API_REFRESH_TOKEN)"
-    );
-  }
-
-  const oAuth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET);
-  oAuth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
-
-  const toHeader = Array.isArray(to) ? to.join(", ") : to;
-
-  const mimeLines = [
-    `From: ${from}`,
-    `To: ${toHeader}`,
-    `Subject: ${subject}`,
-    "MIME-Version: 1.0",
-    isHtml
-      ? 'Content-Type: text/html; charset="UTF-8"'
-      : 'Content-Type: text/plain; charset="UTF-8"',
-    "",
-    body,
-  ];
-
-  const raw = Buffer.from(mimeLines.join("\n"))
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-
-  const gmail = google.gmail({ version: "v1", auth: oAuth2Client });
-  const res = await gmail.users.messages.send({
-    userId: "me",
-    requestBody: { raw },
-  });
-
-  return res.data;
-}
-
-function decodeBase64Url(input = "") {
-  // Gmail returns base64url strings
-  const s = input.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = s.length % 4 === 0 ? 0 : 4 - (s.length % 4);
-  return Buffer.from(s + "=".repeat(pad), "base64").toString("utf8");
-}
-
-function findPartWithMime(parts, mimeType) {
-  if (!parts) return null;
-  for (const p of parts) {
-    if (p.mimeType === mimeType && p.body && p.body.data) return p;
-    if (p.parts) {
-      const nested = findPartWithMime(p.parts, mimeType);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
-
+// Initialize and return an authenticated OAuth2 client
 async function getAuthClient() {
   const CLIENT_ID = process.env.GMAIL_API_CLIENT_ID;
   const CLIENT_SECRET = process.env.GMAIL_API_CLIENT_SECRET;
@@ -85,20 +25,63 @@ async function getAuthClient() {
   return oAuth2Client;
 }
 
-// Search for a message with a subject containing the briefing token and return its threadId
-export async function findThreadIdByBriefingToken(token) {
-  const auth = await getAuthClient();
-  const gmail = google.gmail({ version: "v1", auth });
+// Send an email using Gmail API
+export async function sendEmail({ from, to, subject = "", body = "", isHtml = false }) {
+  const oAuth2Client = await getAuthClient();
 
-  // Search for messages with the token in the subject
-  const q = `subject:"${token}"`;
-  const res = await gmail.users.messages.list({ userId: "me", q, maxResults: 5 });
-  const messages = res.data.messages || [];
-  if (!messages.length) return null;
+  // Construct the email
+  const toHeader = Array.isArray(to) ? to.join(", ") : to;
 
-  // Get the first message to obtain threadId
-  const msg = await gmail.users.messages.get({ userId: "me", id: messages[0].id, format: "metadata" });
-  return msg.data.threadId || null;
+  const mimeLines = [
+    `From: ${from}`,
+    `To: ${toHeader}`,
+    `Subject: ${subject}`,
+    "MIME-Version: 1.0",
+    isHtml
+      ? 'Content-Type: text/html; charset="UTF-8"'
+      : 'Content-Type: text/plain; charset="UTF-8"',
+    "",
+    body,
+  ];
+
+  // Encode the email in base64url format
+  const raw = Buffer.from(mimeLines.join("\n"))
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  // Send the email
+  const gmail = google.gmail({ version: "v1", auth: oAuth2Client });
+  const res = await gmail.users.messages.send({
+    userId: "me",
+    requestBody: { raw },
+  });
+
+  return res.data;
+}
+
+// Decode a base64url-encoded string from Gmail API responses
+// used by getThreadMessages to decode message bodies
+function decodeBase64Url(input = "") {
+  // Gmail returns base64url strings
+  const s = input.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = s.length % 4 === 0 ? 0 : 4 - (s.length % 4);
+  return Buffer.from(s + "=".repeat(pad), "base64").toString("utf8");
+}
+
+// Find a part with a specific MIME type in the message parts 
+// used by getThreadMessages to
+function findPartWithMime(parts, mimeType) {
+  if (!parts) return null;
+  for (const p of parts) {
+    if (p.mimeType === mimeType && p.body && p.body.data) return p;
+    if (p.parts) {
+      const nested = findPartWithMime(p.parts, mimeType);
+      if (nested) return nested;
+    }
+  }
+  return null;
 }
 
 // Fetch all messages in a thread and return parsed info (headers + body plaintext/html snippet)

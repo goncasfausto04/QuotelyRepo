@@ -6,13 +6,11 @@ import QuoteAnalysis from "../components/QuoteAnalysis.js";
 import BriefingInbox from "../components/BriefingInbox.js";
 
 export default function BriefingPage() {
-  const briefingId = new URLSearchParams(window.location.search).get(
-    "briefing"
-  );
-
+  const briefingId = new URLSearchParams(window.location.search).get("briefing");
   const [briefing, setBriefing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("chat");
+  const [generatedEmail, setGeneratedEmail] = useState("");
 
   useEffect(() => {
     async function fetchBriefing() {
@@ -155,7 +153,10 @@ export default function BriefingPage() {
         {activeTab === "chat" && (
           <div className="flex flex-col lg:flex-row gap-6">
             <div className="flex-1 min-w-0">
-              <BriefingChat briefingId={briefing?.id} />
+              <BriefingChat
+                briefingId={briefing?.id}
+                onEmailGenerated={setGeneratedEmail}
+              />
             </div>
           </div>
         )}
@@ -204,7 +205,10 @@ export default function BriefingPage() {
                 directly to suppliers.
               </p>
             </div>
-            <BriefingInbox briefingId={briefing?.id} />
+            <BriefingInbox
+              briefingId={briefing?.id}
+              generatedEmail={generatedEmail}
+            />
           </div>
         )}
       </div>
