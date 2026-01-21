@@ -84,18 +84,7 @@ export default function makeEmailRouter({ supabase }) {
       // sort messages by date from oldest to newest
       messages.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
 
-      // filter out messages sent by own sender address (to avoid showing self-sent emails)
-      const ownSender = (process.env.GMAIL_API_SENDER || "").toLowerCase().trim();
-      // If GMAIL_API_SENDER is configured, filter out messages that come from that address
-      let emailsToReturn = messages || [];
-      if (ownSender) {
-        emailsToReturn = emailsToReturn.filter((e) => {
-          const from = (e.from || "").toLowerCase();
-          return !from.includes(ownSender);
-        });
-      }
-
-      return res.json({ ok: true, threadId, emails: emailsToReturn });
+      return res.json({ ok: true, threadId, emails: messages });
     } catch (err) {
       console.error("Error fetching briefing emails:", err);
       res.status(500).json({ error: "Failed to fetch briefing emails", details: err.message });
