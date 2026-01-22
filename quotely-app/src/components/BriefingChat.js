@@ -1,5 +1,5 @@
 // BriefingChat.js
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { supabase } from "../supabaseClient.js";
 
 export default function BriefingChat({
@@ -35,22 +35,54 @@ export default function BriefingChat({
   // Add this state to store collectedInfo from email generation:
   const [collectedInfo, setCollectedInfo] = useState(null);
 
-  // Prompts for supplier flow
-  const SUPPLIER_PROMPT_YESNO = {
-    role: "SupplierSearchPrompt",
-    content:
-      "Would you like me to search for potential suppliers that match this request? Reply 'yes' or 'no'.",
-    askingLocation: false,
-    retryMode: false,
-  };
+  // Prompts for supplier flow (memoized to keep stable references for effects)
+  const SUPPLIER_PROMPT_YESNO = useMemo(
+    () => ({
+      role: "SupplierSearchPrompt",
+      content:
+        "Would you like me to search for potential suppliers that match this request? Reply 'yes' or 'no'.",
+      askingLocation: false,
+      retryMode: false,
+    }),
+    []
+  );
 
-  const SUPPLIER_PROMPT_RETRY = {
-    role: "SupplierSearchPrompt",
-    content:
-      "Would you like to try searching again? Reply 'yes' to try again or 'no' to skip.",
-    askingLocation: false,
-    retryMode: true,
-  };
+  const SUPPLIER_PROMPT_RETRY = useMemo(
+    () => ({
+      role: "SupplierSearchPrompt",
+      content:
+        "Would you like to try searching again? Reply 'yes' to try again or 'no' to skip.",
+      askingLocation: false,
+      retryMode: true,
+    }),
+    []
+  );
+
+  // Save chat messages to Supabase (stable for hooks that depend on it)
+  const saveChatToSupabase = useCallback(
+    async (newMessages) => {
+      if (!briefingId) return;
+      const { error } = await supabase
+        .from("briefings")
+        .update({ chat: newMessages })
+        .eq("id", briefingId);
+
+      if (error) console.error("Error saving chat:", error.message);
+    },
+    [briefingId]
+  );
+
+  // Append single message and save (stable reference for effects)
+  const appendMessage = useCallback(
+    (newMsg) => {
+      setMessages((prev) => {
+        const updated = [...prev, newMsg];
+        saveChatToSupabase(updated);
+        return updated;
+      });
+    },
+    [saveChatToSupabase]
+  );
 
   // auto-scroll to bottom whenever messages (or loading) change
   useEffect(() => {
@@ -132,27 +164,7 @@ export default function BriefingChat({
     };
 
     initBriefing();
-  }, [initialBriefingId]);
-
-  // Save chat messages to Supabase
-  const saveChatToSupabase = async (newMessages) => {
-    if (!briefingId) return;
-    const { error } = await supabase
-      .from("briefings")
-      .update({ chat: newMessages })
-      .eq("id", briefingId);
-
-    if (error) console.error("Error saving chat:", error.message);
-  };
-
-  // Append single message and save
-  const appendMessage = (newMsg) => {
-    setMessages((prev) => {
-      const updated = [...prev, newMsg];
-      saveChatToSupabase(updated);
-      return updated;
-    });
-  };
+  }, [initialBriefingId, appendMessage, SUPPLIER_PROMPT_YESNO]);
 
   // Helpers for sending email
   const getGeneratedEmail = () => {
@@ -406,67 +418,6 @@ export default function BriefingChat({
           "Hi! What product or service do you need to request quotes for?",
       },
     ]);
-  };
-
-  // Apply selected supplier to the most recent generated Email message.
-  // This will prepend a "To: Name <email>" header and try to personalise the greeting.
-
-  // not used for now since we are auto sending to quotely but wll be used later
-  const applySupplierToEmail = (supplier) => {
-    if (!supplier) return;
-    // find last Email message index
-    const lastEmailIndex = (() => {
-      for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].role === "Email") return i;
-      }
-      return -1;
-    })();
-
-    if (lastEmailIndex === -1) {
-      alert("No generated email found. Generate the email first and then apply a supplier.");
-      return;
-    }
-
-    setApplyingSupplier(supplier.contact_email || supplier.name || "applying");
-
-    setMessages((prev) => {
-      const updated = [...prev];
-      const original = updated[lastEmailIndex].content || "";
-
-      // Build header
-      const headerParts = [];
-      if (supplier.name) headerParts.push(supplier.name);
-      if (supplier.contact_email) headerParts.push(`<${supplier.contact_email}>`);
-      const header = headerParts.length ? `To: ${headerParts.join(" ")}\n\n` : "";
-
-      // Try to personalise greeting: replace common salutations or insert after first newline
-      let newEmail = original;
-      // replace "Dear Sir/Madam" or "Dear," with "Dear {Name},"
-      if (supplier.name) {
-        newEmail = newEmail.replace(/Dear\s+([A-Za-z'\- ]+)?[,:\n]/i, `Dear ${supplier.name},\n`);
-        if (newEmail === original) {
-          // if no greeting replaced, insert a personalised greeting after any subject line
-          const afterSubject = newEmail.replace(/^Subject:[^\n]*\n+/i, (m) => m + `Dear ${supplier.name},\n\n`);
-          if (afterSubject !== newEmail) newEmail = afterSubject;
-        }
-      }
-
-      // Prepend header if not already present
-      if (!original.startsWith("To:") && header) {
-        newEmail = `${header}${newEmail}`;
-      }
-
-      updated[lastEmailIndex] = {
-        ...updated[lastEmailIndex],
-        content: newEmail,
-      };
-
-      // persist
-      saveChatToSupabase(updated);
-      return updated;
-    });
-
-    setTimeout(() => setApplyingSupplier(null), 800);
   };
 
   // send the generated email to a fixed inbox
