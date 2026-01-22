@@ -162,6 +162,13 @@ export default function Header() {
                   >
                     Profile
                   </Link>
+                  <Link
+                    to="/settings"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-4 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Settings
+                  </Link>
                   <button
                     onClick={() => {
                       setMobileMenuOpen(false);

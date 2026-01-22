@@ -179,9 +179,17 @@ app.use("/api", searchRouter);
 const supplierRouter = makeSupplierRouter({ supabase, randomBytes });
 app.use("/api", supplierRouter);
 
-// Health check
+// Health check endpoints
 app.get("/", (req, res) => {
   res.json({ status: "ok", message: "Quotely API running" });
+});
+
+app.get("/health", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
 });
 
 // Start server

@@ -12,6 +12,7 @@ import Briefings from "./pages/Briefings.js";
 import CreateBriefing from "./pages/CreateBriefing.js";
 import SupplierResponse from "./pages/SupplierResponse.js";
 import Dashboard from "./pages/Dashboard.js";
+import Settings from "./pages/Settings.js";
 
 function App() {
   return (
@@ -59,6 +60,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CreateBriefing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             }
           />
