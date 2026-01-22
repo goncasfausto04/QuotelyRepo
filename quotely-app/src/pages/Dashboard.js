@@ -10,11 +10,7 @@ import {
   Users,
   Award,
   BarChart3,
-  PieChart,
   Activity,
-  CheckCircle,
-  AlertCircle,
-  Calendar,
   Target,
 } from "lucide-react";
 

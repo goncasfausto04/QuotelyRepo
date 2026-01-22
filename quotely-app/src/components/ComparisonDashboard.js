@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient.js";
 import {
-  TrendingUp,
-  TrendingDown,
   Clock,
   DollarSign,
   Award,
@@ -30,8 +28,6 @@ export default function ComparisonDashboard({ briefingId }) {
 
   // new: API + processing state for polling supplier replies
   const API_URL = process.env.REACT_APP_API_URL;
-  const [emailProcessing, setEmailProcessing] = useState(false);
-  const POLL_INTERVAL_MS = 15000;
 
   // extractable fetch so polling and initial load can reuse it
   const fetchQuotes = async () => {

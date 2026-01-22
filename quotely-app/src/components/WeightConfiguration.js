@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import {
   Info,
   Zap,
-  Target,
   CheckCircle,
   AlertCircle,
   Scale,
