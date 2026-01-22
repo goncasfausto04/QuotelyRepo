@@ -29,7 +29,7 @@ export default function Header() {
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => setUser(session?.user || null)
+      (_event, session) => setUser(session?.user || null),
     );
 
     return () => listener.subscription.unsubscribe();

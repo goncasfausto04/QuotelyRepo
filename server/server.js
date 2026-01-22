@@ -5,7 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import { randomBytes } from "crypto";
-import { LinkupClient } from 'linkup-sdk';
+import { LinkupClient } from "linkup-sdk";
 
 // Import route handlers
 import makeEmailRouter from "./routes/email.js";
@@ -18,7 +18,7 @@ dotenv.config();
 console.log("🔍 FRONTEND_URL:", process.env.FRONTEND_URL);
 console.log(
   "🔍 All env vars:",
-  Object.keys(process.env).filter((k) => k.includes("FRONTEND"))
+  Object.keys(process.env).filter((k) => k.includes("FRONTEND")),
 );
 
 // Validate environment variables
@@ -31,7 +31,7 @@ const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
 if (missingVars.length > 0) {
   console.error(
     "❌ Missing required environment variables:",
-    missingVars.join(", ")
+    missingVars.join(", "),
   );
   process.exit(1);
 }
@@ -52,7 +52,7 @@ app.use((req, res, next) => {
 // Initialize Supabase client
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_KEY,
 );
 console.log("✅ Supabase client initialized");
 
@@ -81,7 +81,7 @@ async function saveConversationToDb(briefingId, conversation) {
     console.error("❌ Error saving conversation state:", error.message);
   } else {
     console.log(
-      `✅ Conversation saved (${conversation.history.length} messages)`
+      `✅ Conversation saved (${conversation.history.length} messages)`,
     );
   }
 }
@@ -104,7 +104,7 @@ async function loadConversationFromDb(briefingId) {
   console.log(
     `✅ Conversation loaded from database (${
       data.conversation_state.history?.length || 0
-    } messages)`
+    } messages)`,
   );
 
   return {
@@ -125,7 +125,7 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
 
       console.log(
         `⚠️  API Error (attempt ${i + 1}/${maxRetries}):`,
-        error.status || error.message
+        error.status || error.message,
       );
 
       if (isLastRetry || !isRetriableError) {
@@ -185,10 +185,10 @@ app.get("/", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
-  res.json({ 
-    status: "ok", 
+  res.json({
+    status: "ok",
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
   });
 });
 

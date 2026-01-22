@@ -22,7 +22,7 @@ export default function Settings() {
       const response = await fetch(`${API_URL}/health`, {
         method: "GET",
       });
-      
+
       if (response.ok) {
         setPingStatus("success");
         setLastPing(new Date().toLocaleTimeString());
@@ -35,7 +35,7 @@ export default function Settings() {
       setPingStatus("error");
       console.error("❌ Backend ping failed:", error);
     }
-    
+
     // Reset status after 2 seconds
     setTimeout(() => setPingStatus("idle"), 2000);
   };
@@ -60,7 +60,7 @@ export default function Settings() {
     const newValue = !keepAlive;
     setKeepAlive(newValue);
     localStorage.setItem("quotely_keep_alive", newValue.toString());
-    
+
     if (newValue) {
       setPingStatus("idle");
       setLastPing(null);
@@ -102,9 +102,9 @@ export default function Settings() {
                 <p className="text-sm text-blue-900 dark:text-blue-100">
                   <strong>ℹ️ Note:</strong> This is useful for free-tier hosting
                   services that spin down after inactivity. When disabled, the
-                  backend will work normally but may experience cold starts after
-                  periods of inactivity (typically 15-30 second delay on first
-                  request).
+                  backend will work normally but may experience cold starts
+                  after periods of inactivity (typically 15-30 second delay on
+                  first request).
                 </p>
               </div>
             </div>
@@ -141,10 +141,10 @@ export default function Settings() {
                       pingStatus === "success"
                         ? "text-green-600 dark:text-green-400"
                         : pingStatus === "error"
-                        ? "text-red-600 dark:text-red-400"
-                        : pingStatus === "pinging"
-                        ? "text-blue-600 dark:text-blue-400 animate-pulse"
-                        : "text-gray-400 dark:text-gray-500"
+                          ? "text-red-600 dark:text-red-400"
+                          : pingStatus === "pinging"
+                            ? "text-blue-600 dark:text-blue-400 animate-pulse"
+                            : "text-gray-400 dark:text-gray-500"
                     }`}
                     size={20}
                   />
