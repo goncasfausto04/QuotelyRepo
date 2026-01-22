@@ -136,97 +136,100 @@ export default function ComparisonDashboard({ briefingId }) {
     return params.sort((a, b) => b.count - a.count);
   }, [quotes]);
 
-  const calculateScores = useCallback((weights) => {
-    if (!weights || Object.keys(weights).length === 0) return quotes;
+  const calculateScores = useCallback(
+    (weights) => {
+      if (!weights || Object.keys(weights).length === 0) return quotes;
 
-    const availableParams = getAvailableParameters();
+      const availableParams = getAvailableParameters();
 
-    return quotes
-      .map((quote) => {
-        const parameterScores = {};
+      return quotes
+        .map((quote) => {
+          const parameterScores = {};
 
-        const enabledParams = availableParams.filter((param) => {
-          const weightConfig = weights[param.key];
-          return (
-            weightConfig && weightConfig.enabled && weightConfig.weight > 0
+          const enabledParams = availableParams.filter((param) => {
+            const weightConfig = weights[param.key];
+            return (
+              weightConfig && weightConfig.enabled && weightConfig.weight > 0
+            );
+          });
+
+          if (enabledParams.length === 0)
+            return { ...quote, score: 0, parameterScores: {} };
+
+          enabledParams.forEach((param) => {
+            const weightConfig = weights[param.key];
+            const value = param.getter ? param.getter(quote) : quote[param.key];
+
+            if (value == null || value === "" || isNaN(Number(value))) return;
+
+            const allValues = quotes
+              .map((q) => (param.getter ? param.getter(q) : q[param.key]))
+              .filter((v) => v != null && v !== "" && !isNaN(Number(v)))
+              .map((v) => Number(v))
+              .sort((a, b) => a - b);
+
+            if (allValues.length === 0) return;
+
+            const min = allValues[0];
+            const max = allValues[allValues.length - 1];
+
+            let normalizedScore = 0;
+
+            if (min === max) {
+              normalizedScore = 1;
+            } else if (weightConfig.direction === "higher") {
+              normalizedScore = (value - min) / (max - min);
+            } else {
+              normalizedScore = (max - value) / (max - min);
+            }
+
+            parameterScores[param.key] = {
+              originalValue: value,
+              normalizedScore,
+              weight: weightConfig.weight,
+              rawContribution: normalizedScore * weightConfig.weight,
+              min,
+              max,
+              direction: weightConfig.direction,
+            };
+          });
+
+          const totalRawScore = Object.values(parameterScores).reduce(
+            (sum, score) => sum + score.rawContribution,
+            0,
           );
-        });
+          const totalPossibleScore = Object.values(parameterScores).reduce(
+            (sum, score) => sum + score.weight,
+            0,
+          );
 
-        if (enabledParams.length === 0)
-          return { ...quote, score: 0, parameterScores: {} };
+          const finalScore =
+            totalPossibleScore > 0
+              ? (totalRawScore / totalPossibleScore) * 100
+              : 0;
 
-        enabledParams.forEach((param) => {
-          const weightConfig = weights[param.key];
-          const value = param.getter ? param.getter(quote) : quote[param.key];
+          Object.keys(parameterScores).forEach((key) => {
+            if (totalRawScore > 0) {
+              parameterScores[key].contribution =
+                (parameterScores[key].rawContribution / totalRawScore) * 100;
+            } else {
+              parameterScores[key].contribution = 0;
+            }
+          });
 
-          if (value == null || value === "" || isNaN(Number(value))) return;
-
-          const allValues = quotes
-            .map((q) => (param.getter ? param.getter(q) : q[param.key]))
-            .filter((v) => v != null && v !== "" && !isNaN(Number(v)))
-            .map((v) => Number(v))
-            .sort((a, b) => a - b);
-
-          if (allValues.length === 0) return;
-
-          const min = allValues[0];
-          const max = allValues[allValues.length - 1];
-
-          let normalizedScore = 0;
-
-          if (min === max) {
-            normalizedScore = 1;
-          } else if (weightConfig.direction === "higher") {
-            normalizedScore = (value - min) / (max - min);
-          } else {
-            normalizedScore = (max - value) / (max - min);
-          }
-
-          parameterScores[param.key] = {
-            originalValue: value,
-            normalizedScore,
-            weight: weightConfig.weight,
-            rawContribution: normalizedScore * weightConfig.weight,
-            min,
-            max,
-            direction: weightConfig.direction,
+          return {
+            ...quote,
+            score: finalScore,
+            parameterScores,
+            enabledParamCount: enabledParams.length,
+            rawWeightedSum: totalRawScore,
+            totalWeights: totalPossibleScore,
           };
-        });
-
-        const totalRawScore = Object.values(parameterScores).reduce(
-          (sum, score) => sum + score.rawContribution,
-          0,
-        );
-        const totalPossibleScore = Object.values(parameterScores).reduce(
-          (sum, score) => sum + score.weight,
-          0,
-        );
-
-        const finalScore =
-          totalPossibleScore > 0
-            ? (totalRawScore / totalPossibleScore) * 100
-            : 0;
-
-        Object.keys(parameterScores).forEach((key) => {
-          if (totalRawScore > 0) {
-            parameterScores[key].contribution =
-              (parameterScores[key].rawContribution / totalRawScore) * 100;
-          } else {
-            parameterScores[key].contribution = 0;
-          }
-        });
-
-        return {
-          ...quote,
-          score: finalScore,
-          parameterScores,
-          enabledParamCount: enabledParams.length,
-          rawWeightedSum: totalRawScore,
-          totalWeights: totalPossibleScore,
-        };
-      })
-      .sort((a, b) => b.score - a.score);
-  }, [quotes, getAvailableParameters]);
+        })
+        .sort((a, b) => b.score - a.score);
+    },
+    [quotes, getAvailableParameters],
+  );
 
   const handleWeightsApplied = (weights) => {
     setUserWeights(weights);
@@ -243,7 +246,7 @@ export default function ComparisonDashboard({ briefingId }) {
   useEffect(() => {
     if (briefingId) {
       const savedWeights = localStorage.getItem(
-        `quotely_weights_${briefingId}`
+        `quotely_weights_${briefingId}`,
       );
       if (savedWeights) {
         try {

@@ -314,6 +314,12 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
     alert("Link copied to clipboard!");
   };
 
+  const qrCodeUrl = supplierLink
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
+        supplierLink,
+      )}`
+    : null;
+
   // Rest of your existing functions (resetForm, copyToClipboard, confirmDelete, deleteQuote, refreshQuotes)
   const resetForm = () => {
     setText("");
@@ -426,6 +432,18 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
             <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-200 dark:border-gray-600 mb-4 break-all text-sm text-gray-900 dark:text-gray-100">
               {supplierLink}
             </div>
+            {qrCodeUrl && (
+              <div className="flex flex-col items-center gap-2 mb-4">
+                <img
+                  src={qrCodeUrl}
+                  alt="Supplier link QR code"
+                  className="w-48 h-48 border border-gray-200 dark:border-gray-600 rounded-lg bg-white"
+                />
+                <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
+                  Scan to open the supplier submission link.
+                </p>
+              </div>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={copySupplierLink}
@@ -888,9 +906,8 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                     {quote?.analysis_json?.business_rating_value && (
                       <div className="col-span-2">
                         <span className="font-medium">Business Rating:</span>{" "}
-                        {quote.analysis_json.business_rating_value}/{
-                          quote.analysis_json.business_rating_scale || 5
-                        }
+                        {quote.analysis_json.business_rating_value}/
+                        {quote.analysis_json.business_rating_scale || 5}
                         {quote.analysis_json.business_reviews_count
                           ? ` • ${quote.analysis_json.business_reviews_count} reviews`
                           : ""}
@@ -905,7 +922,7 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
                     <button
                       onClick={() =>
                         copyToClipboard(
-                          JSON.stringify(quote.analysis_json, null, 2)
+                          JSON.stringify(quote.analysis_json, null, 2),
                         )
                       }
                       className="flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs hover:bg-blue-200 dark:hover:bg-blue-900/50 transition"
