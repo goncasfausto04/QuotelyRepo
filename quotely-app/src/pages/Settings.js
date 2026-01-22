@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Activity, Server, Zap } from "lucide-react";
 
 export default function Settings() {
@@ -15,8 +15,8 @@ export default function Settings() {
     }
   }, []);
 
-  // Ping function
-  const pingBackend = async () => {
+  // Ping function (memoized to prevent useEffect re-runs)
+  const pingBackend = useCallback(async () => {
     try {
       setPingStatus("pinging");
       const response = await fetch(`${API_URL}/health`, {
@@ -38,7 +38,7 @@ export default function Settings() {
 
     // Reset status after 2 seconds
     setTimeout(() => setPingStatus("idle"), 2000);
-  };
+  }, [API_URL]);
 
   // Set up interval when keepAlive is enabled
   useEffect(() => {
@@ -53,7 +53,7 @@ export default function Settings() {
     }, 600000); // 10 minutes
 
     return () => clearInterval(interval);
-  }, [keepAlive, API_URL]);
+  }, [keepAlive, pingBackend]);
 
   // Handle toggle
   const handleToggle = () => {
