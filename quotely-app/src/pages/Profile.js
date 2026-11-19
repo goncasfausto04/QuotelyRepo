@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../supabaseClient.js";
+import { ensureUserProfile } from "../userProfile.js";
 import {
   User,
   Building2,
@@ -30,11 +31,7 @@ export default function Profile() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("auth_id", user.id)
-        .single();
+      const { data, error } = await ensureUserProfile(user);
 
       if (error) {
         console.error("Error fetching user:", error);

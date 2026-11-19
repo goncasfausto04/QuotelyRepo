@@ -10,11 +10,15 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "googleapis": "^166.0.0",
-    "linkup-sdk": "^2.5.1",
     "multer": "^2.0.2",
     "open": "^11.0.0"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "gmail:token": "node email_r_token.js"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

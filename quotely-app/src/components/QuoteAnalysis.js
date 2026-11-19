@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient.js";
+import { apiFetch } from "../api.js";
 import {
   CheckCircle,
   AlertCircle,
@@ -29,7 +30,6 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
   });
   const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(false);
-  const API_URL = process.env.REACT_APP_API_URL;
   const [savedQuote, setSavedQuote] = useState(null);
   const [existingQuotes, setExistingQuotes] = useState([]);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
@@ -107,16 +107,11 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
     setSavedQuote(null);
 
     try {
-      const res = await fetch(`${API_URL}/api/analyze-email`, {
+      const data = await apiFetch("/api/analyze-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailText: text }),
+        json: { emailText: text },
+        retry: true, // analysis is safe to repeat
       });
-
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
 
       const analysisResult =
         typeof data.analysis === "string"
@@ -174,15 +169,11 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
       formData.append("pdfFile", pdfFile);
       formData.append("briefingId", briefingId);
 
-      const res = await fetch(`${API_URL}/api/analyze-pdf`, {
+      const data = await apiFetch("/api/analyze-pdf", {
         method: "POST",
         body: formData,
+        timeoutMs: 180000, // big PDFs take a while
       });
-
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
 
       const analysisResult =
         typeof data.analysis === "string"
@@ -290,20 +281,18 @@ export default function QuoteAnalysis({ briefingId, onQuoteAdded }) {
 
     try {
       setGeneratingLink(true);
-      const res = await fetch(`${API_URL}/api/generate-supplier-link`, {
+      // Returns the existing link if one was already created, so links
+      // already shared with suppliers keep working
+      const data = await apiFetch("/api/generate-supplier-link", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ briefingId }),
+        json: { briefingId },
+        retry: true,
       });
-
-      if (!res.ok) throw new Error("Failed to generate link");
-
-      const data = await res.json();
       setSupplierLink(data.supplierLink);
       setShowLinkModal(true);
     } catch (error) {
       console.error("Error generating link:", error);
-      alert("Failed to generate supplier link");
+      alert(`Failed to generate supplier link: ${error.message}`);
     } finally {
       setGeneratingLink(false);
     }

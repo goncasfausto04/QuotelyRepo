@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { Activity, Server, Zap } from "lucide-react";
+import { API_URL } from "../api.js";
 
 export default function Settings() {
   const [keepAlive, setKeepAlive] = useState(false);
   const [lastPing, setLastPing] = useState(null);
   const [pingStatus, setPingStatus] = useState("idle"); // idle | success | error
-  const API_URL = process.env.REACT_APP_API_URL;
 
   // Load saved preference on mount
   useEffect(() => {
@@ -19,7 +19,8 @@ export default function Settings() {
   const pingBackend = useCallback(async () => {
     try {
       setPingStatus("pinging");
-      const response = await fetch(`${API_URL}/health`, {
+      // /health/db also touches the database, keeping Supabase active
+      const response = await fetch(`${API_URL}/health/db`, {
         method: "GET",
       });
 
@@ -38,7 +39,7 @@ export default function Settings() {
 
     // Reset status after 2 seconds
     setTimeout(() => setPingStatus("idle"), 2000);
-  }, [API_URL]);
+  }, []);
 
   // Set up interval when keepAlive is enabled
   useEffect(() => {

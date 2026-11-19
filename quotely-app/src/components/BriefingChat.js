@@ -1,6 +1,7 @@
 // BriefingChat.js
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { supabase } from "../supabaseClient.js";
+import { apiFetch } from "../api.js";
 
 export default function BriefingChat({
   briefingId: initialBriefingId,
@@ -8,7 +9,6 @@ export default function BriefingChat({
   onEmailGenerated,
 }) {
   const [briefingId, setBriefingId] = useState(initialBriefingId || null);
-  const API_URL = process.env.REACT_APP_API_URL;
   const [messages, setMessages] = useState([
     {
       role: "AI",
@@ -31,6 +31,7 @@ export default function BriefingChat({
   // ref for chat scroll container
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const initializedFor = useRef(null);
 
   // Add this state to store collectedInfo from email generation:
   const [collectedInfo, setCollectedInfo] = useState(null);
@@ -59,15 +60,20 @@ export default function BriefingChat({
   );
 
   // Save chat messages to Supabase (stable for hooks that depend on it)
+  // Saves are chained so they reach the DB in order; otherwise an older,
+  // shorter message list could finish last and wipe newer messages.
+  const saveQueue = useRef(Promise.resolve());
   const saveChatToSupabase = useCallback(
-    async (newMessages) => {
-      if (!briefingId) return;
-      const { error } = await supabase
-        .from("briefings")
-        .update({ chat: newMessages })
-        .eq("id", briefingId);
-
-      if (error) console.error("Error saving chat:", error.message);
+    (newMessages) => {
+      if (!briefingId) return saveQueue.current;
+      saveQueue.current = saveQueue.current.then(async () => {
+        const { error } = await supabase
+          .from("briefings")
+          .update({ chat: newMessages })
+          .eq("id", briefingId);
+        if (error) console.error("Error saving chat:", error.message);
+      });
+      return saveQueue.current;
     },
     [briefingId],
   );
@@ -165,20 +171,15 @@ export default function BriefingChat({
           }
         }
         setBriefingId(initialBriefingId);
-      } else {
-        const { data, error } = await supabase
-          .from("briefings")
-          .insert([{ title: "New Briefing" }])
-          .select()
-          .single();
-
-        if (!error) {
-          setBriefingId(data.id);
-        }
       }
     };
 
-    initBriefing();
+    // Only initialise once per briefing (React StrictMode runs effects twice in dev,
+    // which previously appended the supplier prompt twice)
+    if (initialBriefingId && initializedFor.current !== initialBriefingId) {
+      initializedFor.current = initialBriefingId;
+      initBriefing();
+    }
   }, [initialBriefingId, appendMessage, SUPPLIER_PROMPT_YESNO]);
 
   // Helpers for sending email
@@ -258,23 +259,10 @@ export default function BriefingChat({
       if (!isConversationStarted) {
         console.log("Starting new conversation with:", userInput);
 
-        const response = await fetch(`${API_URL}/start`, {
+        const data = await apiFetch("/start", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            description: userInput,
-            briefingId: briefingId,
-          }),
+          json: { description: userInput, briefingId },
         });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error || `Server error: ${response.status}`,
-          );
-        }
-
-        const data = await response.json();
         setIsConversationStarted(true);
 
         // Display the first question
@@ -290,21 +278,10 @@ export default function BriefingChat({
       // CASE 2: Continuing the conversation (subsequent answers)
       console.log("Sending answer:", userInput);
 
-      const response = await fetch(`${API_URL}/next-question`, {
+      const data = await apiFetch("/next-question", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          briefingId: briefingId,
-          userAnswer: userInput,
-        }),
+        json: { briefingId, userAnswer: userInput },
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Server error: ${response.status}`);
-      }
-
-      const data = await response.json();
 
       // CASE 2A: Conversation is complete - generate email THEN prompt for supplier search
       if (data.done) {
@@ -321,19 +298,11 @@ export default function BriefingChat({
         });
 
         try {
-          const emailRes = await fetch(`${API_URL}/compose-email`, {
+          const emailPayload = await apiFetch("/compose-email", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              briefingId: briefingId,
-              collectedInfo: data.collectedInfo,
-            }),
+            json: { briefingId },
+            retry: true, // safe to repeat, nothing is sent
           });
-
-          const emailPayload = await emailRes.json().catch(() => ({}));
-          if (!emailRes.ok) {
-            throw new Error(emailPayload.error || `Status ${emailRes.status}`);
-          }
 
           appendMessage({
             role: "AI",
@@ -410,12 +379,13 @@ export default function BriefingChat({
   };
 
   // Reset conversation to start over
-  const resetConversation = () => {
-    // ✅ UPDATE database flag when resetting
-    supabase
+  const resetConversation = async () => {
+    // Must be awaited: a Supabase query that is never awaited is never sent
+    const { error } = await supabase
       .from("briefings")
-      .update({ conversation_finished: false })
+      .update({ conversation_finished: false, conversation_state: null })
       .eq("id", briefingId);
+    if (error) console.error("Error resetting briefing:", error.message);
 
     setIsConversationStarted(false);
     setEmailGenerated(false);
@@ -425,12 +395,6 @@ export default function BriefingChat({
     setAskingLocation(false);
     setSearchingSuppliers(false);
     setSupplierResults([]);
-    // Clear any persisted search retry state
-    setMessages((prev) => {
-      const updated = prev.filter((msg) => msg.role !== "SupplierSearchPrompt");
-      saveChatToSupabase(updated);
-      return updated;
-    });
     setMessages([
       {
         role: "AI",
@@ -472,16 +436,7 @@ export default function BriefingChat({
         isHtml: false,
       };
 
-      const res = await fetch(`${API_URL}/api/send-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || data.details || `Status ${res.status}`);
-      }
+      await apiFetch("/api/send-email", { method: "POST", json: payload });
 
       appendMessage({
         role: "AI",
@@ -568,19 +523,15 @@ export default function BriefingChat({
       }
 
       // ✅ NOW search suppliers with collectedInfo
-      const res = await fetch(`${API_URL}/api/search-suppliers`, {
+      const payload = await apiFetch("/api/search-suppliers", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        json: {
           briefingId,
           collectedInfo: effectiveCollectedInfo,
           location: location !== "any" ? location : "",
-        }),
+        },
+        retry: true,
       });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const payload = await res.json();
       const results = Array.isArray(payload.suppliers) ? payload.suppliers : [];
 
       // Normalize results

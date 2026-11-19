@@ -1,5 +1,10 @@
-// this file is a standalone script to get OAuth2 tokens for Gmail API access
-// you can run it with `node server/email_r_token.js`
+// Standalone script to get a Gmail OAuth2 refresh token.
+// Run from /server with:  npm run gmail:token
+//
+// IMPORTANT: if your OAuth consent screen is in "Testing" mode, Google expires
+// the refresh token after 7 days. Go to Google Cloud Console -> APIs & Services
+// -> OAuth consent screen -> "Publish app" (In production) so the token stops
+// expiring. Unverified is fine for your own account (you'll just see a warning).
 
 import express from "express";
 import open from "open";
@@ -53,15 +58,10 @@ app.get("/oauth2callback", async (req, res) => {
   try {
     const { tokens } = await oAuth2Client.getToken(code);
     // tokens.refresh_token will be provided on first consent (or if prompt=consent)
-    console.log("TOKENS:", tokens);
-    res.send(
-      `<pre>Got tokens. Check terminal.\n\nRefresh token: ${tokens.refresh_token || "<none returned>"}\n\nClose this page.</pre>`
-    );
-    console.log("\n=== COPY THESE INTO quotely-app/.env ===\n");
-    console.log("GMAIL_API_CLIENT_ID=", CLIENT_ID);
-    console.log("GMAIL_API_CLIENT_SECRET=", CLIENT_SECRET);
-    console.log("GMAIL_API_REFRESH_TOKEN=", tokens.refresh_token);
-    console.log("GMAIL_API_SENDER=youremail@example.com");
+    res.send("<pre>Got tokens. Check the terminal, then close this page.</pre>");
+    console.log("\n=== Put this in server/.env AND in the Render dashboard env vars ===\n");
+    console.log(`GMAIL_API_REFRESH_TOKEN=${tokens.refresh_token || "<none returned>"}`);
+    console.log("GMAIL_API_SENDER=<the gmail address you just authorised>");
     console.log("\nIf refresh_token is empty, re-run with prompt=consent and ensure you revoke previous grant for this app in Google Account > Security > Third-party access.");
     process.exit(0);
   } catch (err) {

@@ -1,213 +1,140 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import { randomBytes } from "crypto";
-import { LinkupClient } from "linkup-sdk";
 
-// Import route handlers
 import makeEmailRouter from "./routes/email.js";
 import makeConversationRouter from "./routes/conversation.js";
 import makeAnalyzeRouter from "./routes/analyze.js";
 import makeSupplierRouter from "./routes/supplier.js";
 import makeSearchRouter from "./routes/search.js";
+import { makeRequireAuth } from "./lib/auth.js";
 
-dotenv.config();
-console.log("🔍 FRONTEND_URL:", process.env.FRONTEND_URL);
-console.log(
-  "🔍 All env vars:",
-  Object.keys(process.env).filter((k) => k.includes("FRONTEND")),
-);
-
-// Validate environment variables
-const requiredEnvVars = [
-  "GEMINI_API_KEY",
-  "SUPABASE_URL",
-  "SUPABASE_SERVICE_KEY",
-];
-const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
+// ---------- Environment ----------
+const requiredEnvVars = ["GEMINI_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"];
+const missingVars = requiredEnvVars.filter((name) => !process.env[name]);
 if (missingVars.length > 0) {
-  console.error(
-    "❌ Missing required environment variables:",
-    missingVars.join(", "),
-  );
+  console.error("❌ Missing required environment variables:", missingVars.join(", "));
   process.exit(1);
 }
 
-console.log("✅ Environment variables loaded");
+const optionalGroups = {
+  "Email (Gmail)": ["GMAIL_API_CLIENT_ID", "GMAIL_API_CLIENT_SECRET", "GMAIL_API_REFRESH_TOKEN", "GMAIL_API_SENDER"],
+  "Supplier search": ["GOOGLE_SEARCH_API_KEY", "GOOGLE_SEARCH_ENGINE_ID"],
+};
+for (const [feature, vars] of Object.entries(optionalGroups)) {
+  const missing = vars.filter((v) => !process.env[v]);
+  if (missing.length) console.warn(`⚠️  ${feature} disabled/partial, missing: ${missing.join(", ")}`);
+}
 
+// ---------- Clients ----------
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const requireAuth = makeRequireAuth(supabase);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+});
+
+// ---------- App ----------
 const app = express();
-app.use(cors());
-app.use(express.json());
+app.set("trust proxy", 1); // Render sits behind a proxy; needed for req.ip
 
-// Request logging middleware
+// CORS: only allow our frontend(s). FRONTEND_URL may be a comma separated list.
+// Localhost is always allowed for development. Vercel preview deploys can be
+// allowed with ALLOW_VERCEL_PREVIEWS=true.
+const allowedOrigins = new Set(
+  (process.env.FRONTEND_URL || "")
+    .split(",")
+    .map((o) => o.trim().replace(/\/+$/, ""))
+    .filter(Boolean),
+);
+app.use(
+  cors({
+    origin(origin, cb) {
+      if (!origin) return cb(null, true); // curl, health checks, server-to-server
+      const normalized = origin.replace(/\/+$/, "");
+      if (
+        allowedOrigins.size === 0 ||
+        allowedOrigins.has(normalized) ||
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized) ||
+        (process.env.ALLOW_VERCEL_PREVIEWS === "true" && /^https:\/\/[\w-]+\.vercel\.app$/.test(normalized))
+      ) {
+        return cb(null, true);
+      }
+      cb(null, false);
+    },
+  }),
+);
+app.use(express.json({ limit: "1mb" }));
+
 app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
-  console.log(`\n[${timestamp}] ${req.method} ${req.path}`);
+  if (req.path !== "/health" && req.path !== "/") {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  }
   next();
 });
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY,
-);
-console.log("✅ Supabase client initialized");
-
-// Configure multer for file uploads (in-memory)
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-});
-console.log("✅ File upload middleware configured");
-
-// Helper to save conversation to database
-async function saveConversationToDb(briefingId, conversation) {
-  console.log(`💾 Saving conversation state for briefing: ${briefingId}`);
-
-  const { error } = await supabase
-    .from("briefings")
-    .update({
-      conversation_state: {
-        history: conversation.history,
-        description: conversation.description,
-      },
-    })
-    .eq("id", briefingId);
-
-  if (error) {
-    console.error("❌ Error saving conversation state:", error.message);
-  } else {
-    console.log(
-      `✅ Conversation saved (${conversation.history.length} messages)`,
-    );
-  }
-}
-
-// Helper to load conversation from database
-async function loadConversationFromDb(briefingId) {
-  console.log(`📂 Loading conversation state for briefing: ${briefingId}`);
-
-  const { data, error } = await supabase
-    .from("briefings")
-    .select("conversation_state")
-    .eq("id", briefingId)
-    .single();
-
-  if (error || !data?.conversation_state) {
-    console.log(`⚠️  No conversation state found in database`);
-    return null;
-  }
-
-  console.log(
-    `✅ Conversation loaded from database (${
-      data.conversation_state.history?.length || 0
-    } messages)`,
-  );
-
-  return {
-    history: data.conversation_state.history || [],
-    description: data.conversation_state.description,
-    briefingId: briefingId,
-  };
-}
-
-// Retry with exponential backoff
-async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      const isLastRetry = i === maxRetries - 1;
-      const isRetriableError = error?.status === 503 || error?.status === 429;
-
-      console.log(
-        `⚠️  API Error (attempt ${i + 1}/${maxRetries}):`,
-        error.status || error.message,
-      );
-
-      if (isLastRetry || !isRetriableError) {
-        console.error(`❌ Max retries reached or non-retriable error`);
-        throw error;
-      }
-
-      const delay = baseDelay * Math.pow(2, i);
-      console.log(`⏳ Retrying in ${delay}ms...`);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-}
-
-// mount analyze routes (email + pdf)
-// Initialize Google AI
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
-console.log("✅ Google AI client initialized");
-
-const emailRouter = makeEmailRouter({ supabase, retryWithBackoff });
-app.use("/api", emailRouter);
-
-const analyzeRouter = makeAnalyzeRouter({
-  ai,
-  retryWithBackoff,
-  supabase,
-  upload,
-});
-app.use("/api", analyzeRouter);
-
-// In-memory conversation state and mount conversation routes
-const conversations = new Map();
-console.log("💬 Conversation manager initialized");
-const conversationRouter = makeConversationRouter({
-  ai,
-  retryWithBackoff,
-  saveConversationToDb,
-  loadConversationFromDb,
-  conversations,
-  supabase,
-});
-app.use("/", conversationRouter);
-
-// Mount search router
-const searchRouter = makeSearchRouter({ ai, retryWithBackoff });
-app.use("/api", searchRouter);
-
-// mount supplier routes (generate link, public briefing and submit quote)
-const supplierRouter = makeSupplierRouter({ supabase, randomBytes });
-app.use("/api", supplierRouter);
-
-// Health check endpoints
-app.get("/", (req, res) => {
-  res.json({ status: "ok", message: "Quotely API running" });
-});
+// ---------- Health ----------
+app.get("/", (req, res) => res.json({ status: "ok", message: "Quotely API running" }));
 
 app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+  res.json({ status: "ok", timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
-// Start server
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log("\n" + "=".repeat(60));
-  console.log("🚀 Quotely AI Backend Server");
-  console.log("=".repeat(60));
-  console.log(`📍 Server running on: http://localhost:${PORT}`);
-  console.log(`🏥 Health check: http://localhost:${PORT}/`);
-  console.log("\n📡 Available Endpoints:");
-  console.log("  POST /api/analyze-email - Analyze quote emails");
-  console.log("  POST /api/analyze-pdf - Analyze quote PDFs");
-  console.log("  POST /start - Start RFQ conversation");
-  console.log("  POST /next-question - Get next question");
-  console.log("  POST /compose-email - Generate RFQ email");
-  console.log("  POST /api/generate-supplier-link - Create supplier link");
-  console.log("  GET  /api/supplier-briefing/:token - Get briefing info");
-  console.log("  POST /api/supplier-submit-quote - Submit supplier quote");
-  console.log("=".repeat(60) + "\n");
+// Touches the database too. Pinging this regularly keeps both the Render
+// server awake AND counts as Supabase activity (free projects pause after
+// ~7 days without any).
+app.get("/health/db", async (req, res) => {
+  const started = Date.now();
+  try {
+    const { error } = await supabase.from("briefings").select("id", { head: true, count: "exact" }).limit(1);
+    if (error) throw error;
+    res.json({ status: "ok", db: "ok", latencyMs: Date.now() - started });
+  } catch (err) {
+    console.error("❌ DB health check failed:", err.message);
+    res.status(503).json({ status: "degraded", db: "unreachable", error: err.message });
+  }
 });
+
+// ---------- Routes ----------
+app.use("/api", makeEmailRouter({ supabase, requireAuth }));
+app.use("/api", makeAnalyzeRouter({ ai, supabase, upload, requireAuth }));
+app.use("/api", makeSearchRouter({ ai, supabase, requireAuth }));
+app.use("/api", makeSupplierRouter({ supabase, randomBytes, requireAuth }));
+app.use("/", makeConversationRouter({ ai, supabase, requireAuth }));
+
+app.use((req, res) => res.status(404).json({ error: "Not found" }));
+
+// Central error handler: every thrown error becomes a JSON response
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err?.type === "entity.too.large") return res.status(413).json({ error: "Request is too large" });
+  if (err?.type === "entity.parse.failed") return res.status(400).json({ error: "Invalid JSON body" });
+  const status = Number(err?.status) >= 400 && Number(err?.status) < 600 ? Number(err.status) : 500;
+  if (status >= 500) console.error(`❌ ${req.method} ${req.path}:`, err);
+  res.status(status).json({ error: status >= 500 && !err?.status ? "Internal server error" : err.message });
+});
+
+process.on("unhandledRejection", (reason) => console.error("❌ Unhandled rejection:", reason));
+
+// ---------- Start ----------
+const PORT = process.env.PORT || 3001;
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Quotely API listening on port ${PORT}`);
+  console.log(`   CORS origins: ${allowedOrigins.size ? [...allowedOrigins].join(", ") : "any (FRONTEND_URL not set)"}`);
+});
+
+const shutdown = (signal) => {
+  console.log(`${signal} received, shutting down`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 10_000).unref();
+};
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

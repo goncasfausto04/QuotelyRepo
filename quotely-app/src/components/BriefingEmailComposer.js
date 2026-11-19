@@ -3,6 +3,7 @@
 // used in briefing inbox view
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "../api.js";
 
 export default function BriefingEmailComposer({ briefingId, getGeneratedEmail, onSent }) {
   const [sendOption, setSendOption] = useState("generated"); // user options: generated, custom ; starts with generated
@@ -26,8 +27,6 @@ export default function BriefingEmailComposer({ briefingId, getGeneratedEmail, o
     }
   }, [getGeneratedEmail]); // Re-run this effect whenever getGeneratedEmail changes
 
-  // Send email via backend API
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
 
   // send through post to /api/send-email ( located in server/routes/email.js )
   const sendEmailForBriefing = async () => {
@@ -49,23 +48,16 @@ export default function BriefingEmailComposer({ briefingId, getGeneratedEmail, o
 
     setSendLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/send-email`, {
+      await apiFetch("/api/send-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        json: {
           briefingId,
           subject: `Quote Request from Quotely`,
           body,
           recipients,
           isHtml: false,
-        }),
+        },
       });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const errMsg = data.details || data.error || `Status ${res.status}`;
-        throw new Error(errMsg);
-      }
 
       if (typeof onSent === "function") onSent(recipients);
       // keep generatedText so it remains visible; clear custom only

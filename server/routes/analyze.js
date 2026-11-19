@@ -1,232 +1,204 @@
 import express from "express";
+import { generateJson, aiErrorMessage } from "../lib/ai.js";
+import { getOwnedBriefing, asyncRoute, rateLimit, HttpError } from "../lib/auth.js";
 
-export default function makeAnalyzeRouter({
-  ai,
-  retryWithBackoff,
-  supabase,
-  upload,
-}) {
+const MAX_EMAIL_CHARS = 100_000;
+
+const OUTPUT_SCHEMA = `{
+  "supplier_name": "string or null",
+  "contact_email": "string or null",
+  "contact_phone": "string or null",
+  "total_price": number or null,
+  "currency": "ISO 4217 code string or null",
+  "unit_price": number or null,
+  "quantity": number or null,
+  "lead_time_days": number or null,
+  "delivery_date": "YYYY-MM-DD or null",
+  "materials_included": ["array of strings"],
+  "specifications": ["array of key specs mentioned"],
+  "payment_terms": "string or null",
+  "warranty_period": "string or null",
+  "warranty_months": number or null,
+  "shipping_cost": number or null,
+  "additional_fees": [{"description": "string", "amount": number}],
+  "certifications": ["array of certifications mentioned"],
+  "business_rating_value": number or null,
+  "business_rating_scale": number or null,
+  "business_reviews_count": number or null,
+  "business_rating_source": "string or null",
+  "business_profile_url": "string or null",
+  "notes": "string with any additional relevant observations"
+}`;
+
+const extractionPrompt = (sourceLabel) => `You are a data extraction assistant. Extract factual information from this quote ${sourceLabel}. Do NOT provide subjective opinions.
+
+Return a single JSON object with exactly this shape:
+${OUTPUT_SCHEMA}
+
+EXTRACTION RULES:
+1. Extract ONLY factual data present in the ${sourceLabel}
+2. Do NOT make assumptions, do NOT research externally
+3. If a business rating (e.g., 4.7/5, 120 reviews, Trustpilot) is explicitly present, extract it into the rating fields. Otherwise use null.
+4. Convert time periods to days (e.g., "2 weeks" = 14)
+5. Convert warranty to months (e.g., "12 months" = 12, "1 year" = 12)
+6. Numbers must be plain numbers without currency symbols or thousands separators
+7. If information is not explicitly stated, use null`;
+
+const NUMERIC_FIELDS = [
+  "total_price",
+  "unit_price",
+  "quantity",
+  "lead_time_days",
+  "warranty_months",
+  "shipping_cost",
+  "business_rating_value",
+  "business_rating_scale",
+  "business_reviews_count",
+];
+
+// Make sure numeric fields really are numbers (models sometimes return "1,200.00")
+function normalizeAnalysis(raw) {
+  const a = raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw } : {};
+  for (const key of NUMERIC_FIELDS) {
+    const v = a[key];
+    if (v === undefined || v === null || v === "") {
+      a[key] = null;
+    } else if (typeof v !== "number") {
+      const n = Number.parseFloat(String(v).replace(/[^\d.-]/g, ""));
+      a[key] = Number.isFinite(n) ? n : null;
+    }
+  }
+  for (const key of ["quantity", "lead_time_days", "warranty_months", "business_reviews_count", "business_rating_scale"]) {
+    if (a[key] !== null) a[key] = Math.round(a[key]);
+  }
+  if (a.delivery_date && !/^\d{4}-\d{2}-\d{2}$/.test(String(a.delivery_date))) a.delivery_date = null;
+  if (typeof a.currency === "string") a.currency = a.currency.trim().toUpperCase().slice(0, 3) || null;
+  return a;
+}
+
+// Extract explicit business ratings from raw text (no external inference)
+function extractRatings(text) {
+  if (!text || typeof text !== "string") return null;
+  const t = text.replace(/\s+/g, " ");
+  const ratingMatch = t.match(/(\d(?:\.\d)?)\s*(?:\/|out of)\s*(5|10)\b/i);
+  const reviewsMatch = t.match(/(\d{1,6})\s*reviews/i);
+  const sourceMatch = t.match(/(Trustpilot|Google\s*Reviews|Yelp|G2|Capterra|Facebook\s*Reviews)/i);
+  const urlMatch = t.match(
+    /https?:\/\/(?:www\.)?(trustpilot\.com|google\.com\/maps|yelp\.com|g2\.com|capterra\.com)[^\s)]+/i,
+  );
+  if (!ratingMatch && !reviewsMatch && !sourceMatch && !urlMatch) return null;
+  return {
+    business_rating_value: ratingMatch ? parseFloat(ratingMatch[1]) : null,
+    business_rating_scale: ratingMatch ? parseInt(ratingMatch[2], 10) : null,
+    business_reviews_count: reviewsMatch ? parseInt(reviewsMatch[1], 10) : null,
+    business_rating_source: sourceMatch ? sourceMatch[1] : null,
+    business_profile_url: urlMatch ? urlMatch[0] : null,
+  };
+}
+
+export default function makeAnalyzeRouter({ ai, supabase, upload, requireAuth }) {
   const router = express.Router();
 
-  // Extract explicit business ratings from raw text (no external inference)
-  const extractRatings = (text) => {
-    if (!text || typeof text !== "string") return null;
-    const t = text.replace(/\s+/g, " ");
-
-    // Find rating value and scale like 4.7/5 or 4.7 out of 5
-    const ratingMatch = t.match(/(\d(?:\.\d)?)\s*(?:\/|out of)\s*(\d+)/i);
-
-    // Find reviews count like 120 reviews
-    const reviewsMatch = t.match(/(\d{1,6})\s*reviews/i);
-
-    // Source keywords
-    const sourceMatch = t.match(/(Trustpilot|Google\s*Reviews|Google|Yelp|G2|Capterra|Facebook\s*Reviews)/i);
-
-    // Profile URL (basic match for known domains)
-    const urlMatch = t.match(/https?:\/\/(?:www\.)?(trustpilot\.com|google\.com\/maps|yelp\.com|g2\.com|capterra\.com)[^\s)]+/i);
-
-    if (!ratingMatch && !reviewsMatch && !sourceMatch && !urlMatch) return null;
-
-    const value = ratingMatch ? parseFloat(ratingMatch[1]) : null;
-    const scale = ratingMatch ? parseInt(ratingMatch[2], 10) : null;
-    const reviews = reviewsMatch ? parseInt(reviewsMatch[1], 10) : null;
-    const source = sourceMatch ? sourceMatch[1] : null;
-    const profileUrl = urlMatch ? urlMatch[0] : null;
-
-    return {
-      business_rating_value: isNaN(value) ? null : value,
-      business_rating_scale: isNaN(scale) ? null : scale,
-      business_reviews_count: isNaN(reviews) ? null : reviews,
-      business_rating_source: source,
-      business_profile_url: profileUrl,
-    };
-  };
-
-  // Email analysis
-  router.post("/analyze-email", async (req, res) => {
-    const { emailText } = req.body;
-
-    console.log("📧 Email analysis requested");
-    console.log(`📝 Email length: ${emailText?.length || 0} characters`);
-
-    if (!emailText?.trim()) {
-      console.log("❌ No email text provided");
-      return res.status(400).json({ error: "No email text provided" });
-    }
-
-    try {
-      console.log("🤖 Sending to AI for analysis...");
-
-      const response = await retryWithBackoff(async () => {
-        return await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: `You are a data extraction assistant. Extract factual information from this quote email. Do NOT provide subjective opinions.
-
-REQUIRED OUTPUT FORMAT (valid JSON only, no markdown):
-{\n  "supplier_name": "string or null",\n  "contact_email": "string or null",\n  "contact_phone": "string or null",\n  "total_price": number or null,\n  "currency": "string or null",\n  "unit_price": number or null,\n  "quantity": number or null,\n  "lead_time_days": number or null,\n  "delivery_date": "YYYY-MM-DD or null",\n  "materials_included": ["array of strings"],\n  "specifications": ["array of key specs mentioned"],\n  "payment_terms": "string or null",\n  "warranty_period": "string or null",\n  "warranty_months": number or null,\n  "shipping_cost": number or null,\n  "additional_fees": [{"description": "string", "amount": number}],\n  "certifications": ["array of certifications mentioned"],\n  "business_rating_value": number or null,\n  "business_rating_scale": number or null,\n  "business_reviews_count": number or null,\n  "business_rating_source": "string or null",\n  "business_profile_url": "string or null",\n  "notes": "string with any additional relevant observations"\n}\n\nEXTRACTION RULES:\n1. Extract ONLY factual data present in the email\n2. Do NOT make assumptions, do NOT research externally\n3. If a business rating (e.g., 4.7/5, 120 reviews, Trustpilot) is explicitly present, extract it into the rating fields above. If not present, use null.\n4. Convert time periods to days (e.g., "2 weeks" = 14)\n5. Convert warranty to months (e.g., "12 months" = 12, "1 year" = 12)\n6. Extract ALL numerical values without currency symbols\n7. If information is not explicitly stated, use null\n8. Ensure output is valid JSON without markdown formatting\n\nEMAIL TO ANALYZE:\n${emailText}\n\nOUTPUT (valid JSON only):`,
-        });
-      });
-
-      let cleanText = response.text.trim();
-      cleanText = cleanText.replace(/```json\s*/g, "").replace(/```\s*/g, "");
-
-      const jsonMatch = cleanText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-      if (jsonMatch) {
-        cleanText = jsonMatch[0];
-      }
-
-      console.log("✅ Email analysis completed successfully");
-      console.log(`📊 Extracted data length: ${cleanText.length} characters`);
-
-      // Merge explicit ratings from the raw email if present
-      let finalJsonStr = cleanText;
-      try {
-        const parsed = JSON.parse(cleanText);
-        const ratings = extractRatings(emailText);
-        if (ratings) {
-          // Only fill if AI didn't provide them
-          parsed.business_rating_value = parsed.business_rating_value ?? ratings.business_rating_value;
-          parsed.business_rating_scale = parsed.business_rating_scale ?? ratings.business_rating_scale;
-          parsed.business_reviews_count = parsed.business_reviews_count ?? ratings.business_reviews_count;
-          parsed.business_rating_source = parsed.business_rating_source ?? ratings.business_rating_source;
-          parsed.business_profile_url = parsed.business_profile_url ?? ratings.business_profile_url;
-          finalJsonStr = JSON.stringify(parsed);
-        }
-        console.log(
-          "⭐ Rating (email):",
-          parsed.business_rating_value,
-          parsed.business_rating_scale,
-          parsed.business_reviews_count,
-          parsed.business_rating_source
-        );
-      } catch (_) {
-        // ignore parse errors for logging
-      }
-
-      res.json({ analysis: finalJsonStr });
-    } catch (err) {
-      console.error("❌ Error analyzing email:", err.message);
-      res.status(500).json({
-        error:
-          err.status === 503
-            ? "AI service is temporarily overloaded. Please try again in a moment."
-            : "Failed to analyze email",
-        details: err.message,
-      });
-    }
+  const aiLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 60,
+    keyFn: (req) => req.user.id,
+    message: "AI analysis limit reached (60 per hour). Try again later.",
   });
 
-  // PDF analysis
-  router.post("/analyze-pdf", upload.single("pdfFile"), async (req, res) => {
-    const { briefingId } = req.body;
+  router.post(
+    "/analyze-email",
+    requireAuth,
+    aiLimiter,
+    asyncRoute(async (req, res) => {
+      const { emailText } = req.body || {};
+      if (typeof emailText !== "string" || !emailText.trim()) throw new HttpError(400, "No email text provided");
+      if (emailText.length > MAX_EMAIL_CHARS) throw new HttpError(413, "Email is too long to analyze");
 
-    console.log("📄 PDF analysis requested");
+      console.log(`📧 Email analysis requested (${emailText.length} chars)`);
 
-    if (!req.file) {
-      console.log("❌ No PDF file uploaded");
-      return res.status(400).json({ error: "No PDF file uploaded" });
-    }
-
-    if (!briefingId) {
-      console.log("❌ No briefing ID provided");
-      return res.status(400).json({ error: "Briefing ID is required" });
-    }
-
-    console.log(
-      `📎 File: ${req.file.originalname} (${(req.file.size / 1024).toFixed(
-        2
-      )} KB)`
-    );
-    console.log(`🆔 Briefing ID: ${briefingId}`);
-
-    try {
-      console.log("🤖 Sending PDF to AI for analysis...");
-
-      const pdfBase64 = req.file.buffer.toString("base64");
-      console.log(
-        `🔄 PDF encoded to base64 (${(pdfBase64.length / 1024).toFixed(2)} KB)`
-      );
-
-      const response = await retryWithBackoff(
-        async () => {
-          return await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: [
-              {
-                inlineData: {
-                  mimeType: "application/pdf",
-                  data: pdfBase64,
-                },
-              },
-              {
-                text: `You are a data extraction assistant. Extract factual information from this quote PDF. Do NOT provide subjective opinions.
-
-REQUIRED OUTPUT FORMAT (valid JSON only, no markdown):\n{\n  "supplier_name": "string or null",\n  "contact_email": "string or null",\n  "contact_phone": "string or null",\n  "total_price": number or null,\n  "currency": "string or null",\n  "unit_price": number or null,\n  "quantity": number or null,\n  "lead_time_days": number or null,\n  "delivery_date": "YYYY-MM-DD or null",\n  "materials_included": ["array of strings"],\n  "specifications": ["array of key specs mentioned"],\n  "payment_terms": "string or null",\n  "warranty_period": "string or null",\n  "warranty_months": number or null,\n  "shipping_cost": number or null,\n  "additional_fees": [{"description": "string", "amount": number}],\n  "certifications": ["array of certifications mentioned"],\n  "business_rating_value": number or null,\n  "business_rating_scale": number or null,\n  "business_reviews_count": number or null,\n  "business_rating_source": "string or null",\n  "business_profile_url": "string or null",\n  "notes": "string with any additional relevant observations"\n}\n\nEXTRACTION RULES:\n1. Extract ONLY factual data present in the PDF\n2. Do NOT make assumptions, do NOT research externally\n3. If a business rating (e.g., 4.7/5, 120 reviews, Trustpilot) is explicitly present, extract it into the rating fields above. If not present, use null.\n4. Convert time periods to days (e.g., "2 weeks" = 14)\n5. Convert warranty to months (e.g., "12 months" = 12, "1 year" = 12)\n6. Extract ALL numerical values without currency symbols\n7. If information is not explicitly stated, use null\n8. Ensure output is valid JSON without markdown formatting\n\nOUTPUT (valid JSON only):`,
-              },
-            ],
-          });
-        },
-        5,
-        2000
-      );
-
-      let cleanText = response.text.trim();
-      cleanText = cleanText.replace(/``````\s*/g, "");
-
-      const jsonMatch = cleanText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-      if (jsonMatch) {
-        cleanText = jsonMatch[0];
+      let analysis;
+      try {
+        analysis = normalizeAnalysis(
+          await generateJson(ai, `${extractionPrompt("email")}\n\nEMAIL TO ANALYZE:\n"""\n${emailText}\n"""`),
+        );
+      } catch (err) {
+        console.error("❌ Email analysis failed:", err.message);
+        throw new HttpError(502, aiErrorMessage(err, "Failed to analyze email"));
       }
 
-      const analysis = JSON.parse(cleanText);
-      console.log(
-        "⭐ Rating (pdf):",
-        analysis.business_rating_value,
-        analysis.business_rating_scale,
-        analysis.business_reviews_count,
-        analysis.business_rating_source
-      );
-      console.log("✅ PDF analysis completed successfully");
+      const ratings = extractRatings(emailText);
+      if (ratings) {
+        for (const [k, v] of Object.entries(ratings)) analysis[k] = analysis[k] ?? v;
+      }
 
-      // Optionally upload PDF to Supabase Storage
+      console.log("✅ Email analysis completed");
+      // Kept as a JSON string for backwards compatibility with the frontend
+      res.json({ analysis: JSON.stringify(analysis) });
+    }),
+  );
+
+  // Wrap multer so upload errors (too big, etc.) return clean JSON
+  const singlePdf = (req, res, next) =>
+    upload.single("pdfFile")(req, res, (err) => {
+      if (!err) return next();
+      if (err.code === "LIMIT_FILE_SIZE") return next(new HttpError(413, "PDF must be 10MB or smaller"));
+      next(new HttpError(400, err.message));
+    });
+
+  router.post(
+    "/analyze-pdf",
+    requireAuth,
+    aiLimiter,
+    singlePdf,
+    asyncRoute(async (req, res) => {
+      if (!req.file) throw new HttpError(400, "No PDF file uploaded");
+
+      const isPdf =
+        req.file.mimetype === "application/pdf" && req.file.buffer.subarray(0, 5).toString("latin1") === "%PDF-";
+      if (!isPdf) throw new HttpError(400, "File must be a PDF");
+
+      const briefing = await getOwnedBriefing(supabase, req.body?.briefingId, req.user.id);
+      console.log(`📄 PDF analysis: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)} KB)`);
+
+      let analysis;
+      try {
+        analysis = normalizeAnalysis(
+          await generateJson(
+            ai,
+            [
+              { inlineData: { mimeType: "application/pdf", data: req.file.buffer.toString("base64") } },
+              { text: extractionPrompt("PDF") },
+            ],
+            { retries: 4, baseDelay: 2000 },
+          ),
+        );
+      } catch (err) {
+        console.error("❌ PDF analysis failed:", err.message);
+        throw new HttpError(502, aiErrorMessage(err, "Failed to analyze PDF"));
+      }
+
+      // Store the PDF (non-critical)
       let pdfUrl = null;
       try {
-        console.log("☁️  Uploading PDF to storage...");
-        const fileName = `${briefingId}/${Date.now()}_${req.file.originalname}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const safeName = req.file.originalname.replace(/[^\w.-]+/g, "_").slice(-100) || "quote.pdf";
+        const fileName = `${briefing.id}/${Date.now()}_${safeName}`;
+        const { error: uploadError } = await supabase.storage
           .from("quote-pdfs")
-          .upload(fileName, req.file.buffer, {
-            contentType: "application/pdf",
-          });
-
-        if (!uploadError) {
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from("quote-pdfs").getPublicUrl(fileName);
-          pdfUrl = publicUrl;
-          console.log("✅ PDF uploaded to storage:", fileName);
+          .upload(fileName, req.file.buffer, { contentType: "application/pdf" });
+        if (uploadError) {
+          console.warn("⚠️  PDF storage upload error:", uploadError.message);
         } else {
-          console.log("⚠️  PDF storage upload error:", uploadError.message);
+          pdfUrl = supabase.storage.from("quote-pdfs").getPublicUrl(fileName).data.publicUrl;
         }
       } catch (storageError) {
-        console.warn(
-          "⚠️  PDF storage failed (non-critical):",
-          storageError.message
-        );
+        console.warn("⚠️  PDF storage failed (non-critical):", storageError.message);
       }
 
-      res.json({
-        analysis: cleanText,
-        pdfUrl: pdfUrl,
-      });
-    } catch (err) {
-      console.error("Error analyzing PDF:", err);
-      res.status(500).json({
-        error: "Failed to analyze PDF",
-        details: err.message,
-      });
-    }
-  });
+      console.log("✅ PDF analysis completed");
+      res.json({ analysis: JSON.stringify(analysis), pdfUrl });
+    }),
+  );
 
   return router;
 }

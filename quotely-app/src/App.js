@@ -13,6 +13,11 @@ import CreateBriefing from "./pages/CreateBriefing.js";
 import SupplierResponse from "./pages/SupplierResponse.js";
 import Dashboard from "./pages/Dashboard.js";
 import Settings from "./pages/Settings.js";
+import { warmUpBackend } from "./api.js";
+
+// Start waking the backend (Render free tier sleeps after 15 min idle) as soon
+// as anyone opens the site, instead of on their first real request.
+warmUpBackend();
 
 function App() {
   return (
@@ -76,7 +81,6 @@ function App() {
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* ✅ ADD THIS - Public Supplier Response Route */}
           <Route
             path="/supplier-response/:token"
             element={<SupplierResponse />}

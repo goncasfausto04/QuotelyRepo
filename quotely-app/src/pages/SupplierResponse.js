@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import { apiFetch } from "../api.js";
 
 export default function SupplierResponse() {
   const { token } = useParams();
@@ -8,7 +9,6 @@ export default function SupplierResponse() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
-  const API_URL = process.env.REACT_APP_API_URL;
 
   const [quoteData, setQuoteData] = useState({
     supplier_name: "",
@@ -25,13 +25,7 @@ export default function SupplierResponse() {
   useEffect(() => {
     const fetchBriefing = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/supplier-briefing/${token}`);
-
-        if (!res.ok) {
-          throw new Error("Invalid or expired link");
-        }
-
-        const data = await res.json();
+        const data = await apiFetch(`/api/supplier-briefing/${token}`);
         setBriefing(data);
       } catch (err) {
         setError(err.message);
@@ -41,7 +35,7 @@ export default function SupplierResponse() {
     };
 
     fetchBriefing();
-  }, [token, API_URL]);
+  }, [token]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -54,15 +48,10 @@ export default function SupplierResponse() {
     setSubmitting(true);
 
     try {
-      const res = await fetch(`${API_URL}/api/supplier-submit-quote`, {
+      await apiFetch("/api/supplier-submit-quote", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, quoteData }),
+        json: { token, quoteData },
       });
-
-      if (!res.ok) {
-        throw new Error("Failed to submit quote");
-      }
 
       setSubmitted(true);
     } catch (err) {

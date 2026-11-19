@@ -22,7 +22,7 @@ export default function Header() {
           .from("users")
           .select("photo_url, name")
           .eq("auth_id", authUser.id)
-          .single();
+          .maybeSingle();
 
         if (!error && profile) setPhotoUrl(profile.photo_url);
       }

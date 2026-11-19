@@ -33,3 +33,37 @@ Quotely is a modern web application that helps businesses collect, analyze, and 
 - **Encrypted Storage**: All sensitive data encrypted at rest and in transit
 
 ## https://quotely-repo.vercel.app 
+
+---
+
+## 🛠️ Running & operating
+
+### Local development
+```bash
+cd server && cp .env.example .env   # fill it in
+npm install && npm run dev          # http://localhost:3001
+
+cd quotely-app && cp .env.example .env
+npm install && npm start            # http://localhost:3000
+```
+
+### Secrets: never commit them
+Only `REACT_APP_*` variables belong in the frontend, and they are **public** once built.
+`SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY` and the Gmail credentials live only in `server/.env`
+and in the Render dashboard. Google automatically disables Gemini keys it finds in public
+GitHub repos, so a committed key gets "regenerated" on you.
+
+### Gmail refresh token keeps expiring?
+If the Google Cloud OAuth consent screen is in **Testing**, refresh tokens expire after **7 days**.
+Google Cloud Console → APIs & Services → OAuth consent screen → **Publish app**. Then get a new
+token once with `cd server && npm run gmail:token` and update `GMAIL_API_REFRESH_TOKEN` on Render.
+
+### Cold starts & Supabase pausing
+- Render free instances sleep after 15 min idle; Supabase free projects pause after ~7 days idle.
+- `.github/workflows/keep-alive.yml` pings `GET /health/db` every 10 min, which keeps both awake.
+  Set the repo variable `BACKEND_URL` (Settings → Secrets and variables → Actions → Variables).
+- The frontend also wakes the backend on page load and retries safe requests through a cold start.
+
+### Database security
+Run `supabase/security.sql` in the Supabase SQL editor to enable Row Level Security.
+The backend verifies the user's Supabase access token on every private endpoint.

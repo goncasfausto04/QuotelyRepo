@@ -16,6 +16,25 @@ import {
   AlertCircle,
 } from "lucide-react";
 import BriefingEmailComposer from "./BriefingEmailComposer.js"; // email composer component
+import { apiFetch } from "../api.js";
+
+// Columns of the quotes table we fill from an AI analysis (everything else stays in analysis_json)
+const QUOTE_DB_FIELDS = [
+  "supplier_name",
+  "contact_email",
+  "contact_phone",
+  "total_price",
+  "currency",
+  "unit_price",
+  "quantity",
+  "lead_time_days",
+  "delivery_date",
+  "payment_terms",
+  "warranty_period",
+  "warranty_months",
+  "shipping_cost",
+  "notes",
+];
 
 export default function BriefingInbox({ briefingId }) {
   const [emails, setEmails] = useState([]); // list of emails
@@ -27,19 +46,15 @@ export default function BriefingInbox({ briefingId }) {
   const [replyText, setReplyText] = useState(""); // reply message text
   const [sendingReply, setSendingReply] = useState(false);
   const [generatedEmail, setGeneratedEmail] = useState(""); // generated email text
-
-  const API_URL = process.env.REACT_APP_API_URL;
+  const [analyzingId, setAnalyzingId] = useState(null); // email currently being approved/analyzed
 
   // Fetch emails for this briefing
   const fetchEmails = useCallback(async () => {
     if (!briefingId) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/briefings/${briefingId}/emails`);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch emails: ${res.status}`);
-      }
-      const data = await res.json();
+      setError(null);
+      const data = await apiFetch(`/api/briefings/${briefingId}/emails`);
 
       // Get email statuses from database
       const { data: statusData } = await supabase
@@ -54,11 +69,13 @@ export default function BriefingInbox({ briefingId }) {
       });
 
       // Merge status with emails
-      const emailsWithStatus = (data.emails || []).map((email) => ({
-        ...email,
-        status: statusMap[email.id]?.status || "pending", // default to pending
-        notes: statusMap[email.id]?.notes || "",
-      }));
+      const emailsWithStatus = (data.emails || [])
+        .map((email) => ({
+          ...email,
+          status: statusMap[email.id]?.status || "pending", // default to pending
+          notes: statusMap[email.id]?.notes || "",
+        }))
+        .filter((email) => email.status !== "deleted");
 
       // Sort by date, newest first
       emailsWithStatus.sort(
@@ -74,7 +91,7 @@ export default function BriefingInbox({ briefingId }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [briefingId, API_URL]); // Add briefingId and API_URL to dependencies
+  }, [briefingId]);
 
   // Initial fetch
   useEffect(() => {
@@ -130,27 +147,23 @@ export default function BriefingInbox({ briefingId }) {
     // send reply via API
     setSendingReply(true);
     try {
-      const res = await fetch(`${API_URL}/api/send-email`, {
+      await apiFetch("/api/send-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        json: {
           briefingId,
           subject: `Re: ${email.subject || "Quote Request"}`,
           body: replyText,
           recipients: [email.from],
           isHtml: false,
-        }),
+          replyToMessageId: email.id, // keeps the reply in the supplier's thread
+        },
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.details || data.error || "Failed to send reply");
-      }
 
       alert("Reply sent successfully!");
       setReplyingTo(null);
       setReplyText("");
-      
+      fetchEmails();
+
     } catch (err) {
       console.error("Error sending reply:", err);
       alert(`Failed to send reply: ${err.message}`);
@@ -201,21 +214,31 @@ export default function BriefingInbox({ briefingId }) {
   // send replies to analysis at analyze endpoint when approve is clicked
   // approve -> analyze -> insert quote -> mark approved
   const approveAndAnalyze = async (email) => {
-    if (!email || !briefingId) return;
+    if (!email || !briefingId || analyzingId) return;
+    if (email.status === "approved") {
+      alert("This quote was already approved and saved.");
+      return;
+    }
+    setAnalyzingId(email.id);
     setRefreshing(true);
     try {
-  
-      // call server analyze endpoint
-      const res = await fetch(`${API_URL}/api/analyze-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailText: email.body, briefingId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        console.warn("Analyze failed:", data);
-        throw new Error(data.details || data.error || `Status ${res.status}`);
+      // Don't create a second quote for the same email
+      const { data: existing } = await supabase
+        .from("quotes")
+        .select("id")
+        .eq("briefing_id", briefingId)
+        .eq("message_id", email.id)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        await handleApprove(email.id);
+        return;
       }
+
+      const data = await apiFetch("/api/analyze-email", {
+        method: "POST",
+        json: { emailText: email.body || email.snippet || "" },
+        retry: true, // analysis is safe to repeat
+      });
 
       // parse analysis we get back (server returns analysis as JSON string or object)
       let analysis = data.analysis || null;
@@ -228,19 +251,24 @@ export default function BriefingInbox({ briefingId }) {
       }
 
       // insert into quotes table
+      if (!analysis || typeof analysis !== "object") {
+        throw new Error("Could not read the AI analysis");
+      }
       const insertRow = {
         briefing_id: briefingId,
         raw_email_text: email.body,
         analysis_json: analysis,
-        supplier_name: analysis?.supplier_name || null,
-        contact_email: analysis?.contact_email || null,
-        total_price: analysis?.total_price || null,
-        currency: analysis?.currency || null,
-        lead_time_days: analysis?.lead_time_days || null,
         input_method: "email",
         submitted_by: "supplier",
         message_id: email.id,
       };
+      for (const key of QUOTE_DB_FIELDS) {
+        if (analysis[key] !== undefined) insertRow[key] = analysis[key];
+      }
+      // Fall back to the sender address if the AI found no contact email
+      if (!insertRow.contact_email && email.from) {
+        insertRow.contact_email = (email.from.match(/<([^>]+)>/)?.[1] || email.from).trim();
+      }
 
       const { error: insertErr } = await supabase.from("quotes").insert(insertRow);
       if (insertErr) {
@@ -258,6 +286,7 @@ export default function BriefingInbox({ briefingId }) {
       alert("Failed to analyze and save quote: " + (err.message || err));
     } finally {
       setRefreshing(false);
+      setAnalyzingId(null);
     }
   };
 
@@ -267,11 +296,17 @@ export default function BriefingInbox({ briefingId }) {
     // confirm deletion
     if (!window.confirm("Permanently delete this rejected email from inbox records?")) return;
     try {
-      // delete from email_statuses table in database ( it has the emails, not removed from gmail inbox )
-      const { error: delErr } = await supabase
-        .from("email_statuses")
-        .delete()
-        .match({ briefing_id: briefingId, message_id: messageId });
+      // Mark as deleted (the email stays in Gmail). Previously the status row was
+      // removed, which made the email reappear as "pending" on the next refresh.
+      const { error: delErr } = await supabase.from("email_statuses").upsert(
+        {
+          briefing_id: briefingId,
+          message_id: messageId,
+          status: "deleted",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "briefing_id,message_id" },
+      );
 
       if (delErr) throw delErr;
 
@@ -352,7 +387,7 @@ export default function BriefingInbox({ briefingId }) {
               Email Inbox
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {emails.length} email{emails.length !== 1 ? "s" : ""} in this thread
+              {emails.length} email{emails.length !== 1 ? "s" : ""} for this briefing
             </p>
           </div>
 
@@ -401,7 +436,13 @@ export default function BriefingInbox({ briefingId }) {
                       <span className="font-medium text-gray-900 dark:text-white truncate">
                         {email.from || "Unknown Sender"}
                       </span>
-                      {getStatusBadge(email.status)}
+                      {email.fromMe ? (
+                        <span className="flex items-center gap-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full">
+                          <Send size={12} /> Sent by you
+                        </span>
+                      ) : (
+                        getStatusBadge(email.status)
+                      )}
                     </div>
                     <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-1 truncate">
                       {email.subject || "(No subject)"}
@@ -441,7 +482,9 @@ export default function BriefingInbox({ briefingId }) {
 
                   {/* Actions */}
                   <div className="p-4 bg-gray-100 dark:bg-gray-700/50 flex flex-wrap gap-2">
+                    {!email.fromMe && (<>
                     <button
+                      disabled={analyzingId !== null}
                       onClick={(e) => {
                         e.stopPropagation();
                         approveAndAnalyze(email);
@@ -453,7 +496,7 @@ export default function BriefingInbox({ briefingId }) {
                       }`}
                     >
                       <Check size={16} />
-                      Approve
+                      {analyzingId === email.id ? "Analyzing..." : "Approve"}
                     </button>
 
                     <button
@@ -482,6 +525,7 @@ export default function BriefingInbox({ briefingId }) {
                         Delete
                       </button>
                     )}
+                    </>)}
 
                     <button
                       onClick={(e) => {

@@ -1,11 +1,15 @@
 services:
   - type: web
     name: quotely-backend
-    env: node
+    runtime: node
+    plan: free
     rootDir: server
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
+      - key: NODE_VERSION
+        value: "22"
       - key: GEMINI_API_KEY
         sync: false
       - key: SUPABASE_URL
@@ -14,6 +18,15 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
-      - key: PORT
-        value: 3001
-    healthCheckPath: /
+      - key: GMAIL_API_CLIENT_ID
+        sync: false
+      - key: GMAIL_API_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_API_REFRESH_TOKEN
+        sync: false
+      - key: GMAIL_API_SENDER
+        sync: false
+      - key: GOOGLE_SEARCH_API_KEY
+        sync: false
+      - key: GOOGLE_SEARCH_ENGINE_ID
+        sync: false

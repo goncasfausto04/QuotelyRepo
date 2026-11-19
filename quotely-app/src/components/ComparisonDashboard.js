@@ -26,8 +26,6 @@ export default function ComparisonDashboard({ briefingId }) {
   const [showOnlyComplete, setShowOnlyComplete] = useState(false);
   const [activeTab, setActiveTab] = useState("overview"); // overview | calculations
 
-  // new: API + processing state for polling supplier replies
-  const API_URL = process.env.REACT_APP_API_URL;
 
   // extractable fetch so polling and initial load can reuse it
   const fetchQuotes = useCallback(async () => {
@@ -57,13 +55,6 @@ export default function ComparisonDashboard({ briefingId }) {
     fetchQuotes();
   }, [fetchQuotes]);
 
-  // Poll briefing emails, analyze new replies and insert as quotes (uses thread messages endpoint)
-  useEffect(() => {
-    // Disabled: the ComparisonDashboard should not trigger email analysis or insert quotes.
-    // Email analysis/insertion should be performed explicitly from the Inbox UI or server-side jobs.
-    // Keeping a noop effect to preserve dependency shape if needed in future.
-    return () => {};
-  }, [briefingId, API_URL]);
 
   // Get parameters that exist numerically in at least two quotes for scoring
   const getAvailableParameters = useCallback(() => {

@@ -47,18 +47,21 @@ const Briefings = () => {
 
       // Fetch quote counts for each briefing
       if (briefingsData && briefingsData.length > 0) {
-        const counts = {};
-        for (const briefing of briefingsData) {
-          const { count, error } = await supabase
-            .from("quotes")
-            .select("*", { count: "exact", head: true })
-            .eq("briefing_id", briefing.id);
+        // One query for all briefings instead of one per briefing
+        const { data: quoteRows, error: quotesError } = await supabase
+          .from("quotes")
+          .select("briefing_id")
+          .in(
+            "briefing_id",
+            briefingsData.map((b) => b.id),
+          );
 
-          if (!error) {
-            counts[briefing.id] = count || 0;
-          }
+        if (!quotesError) {
+          const counts = {};
+          for (const b of briefingsData) counts[b.id] = 0;
+          for (const q of quoteRows || []) counts[q.briefing_id] = (counts[q.briefing_id] || 0) + 1;
+          setQuoteCounts(counts);
         }
-        setQuoteCounts(counts);
       }
     } catch (error) {
       console.error("Error fetching briefings:", error);

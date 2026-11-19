@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient.js";
 import { useNavigate } from "react-router-dom";
+import { ensureUserProfile } from "../userProfile.js";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -78,6 +79,8 @@ export default function AuthPage() {
           {
             email: formData.email,
             password: formData.password,
+            // Stored on the auth user too, so the profile row can be created later
+            options: { data: { name: formData.name || null } },
           }
         );
 
@@ -87,14 +90,15 @@ export default function AuthPage() {
           return;
         }
 
-        const { error: dbError } = await supabase.from("users").insert([
-          {
-            auth_id: authData.user.id,
-            email: authData.user.email,
-            name: formData.name || null,
-          },
-        ]);
+        // With "Confirm email" enabled there is no session yet, so we can't
+        // write to the users table (RLS) – the row is created on first login.
+        if (!authData.session) {
+          setSuccessMsg("Account created! Check your inbox to confirm your email, then sign in.");
+          setIsLogin(true);
+          return;
+        }
 
+        const { error: dbError } = await ensureUserProfile(authData.user, formData.name);
         if (dbError) {
           setErrorMsg(dbError.message);
           setIsLoading(false);
