@@ -47,14 +47,28 @@ const app = express();
 app.set("trust proxy", 1); // Render sits behind a proxy; needed for req.ip
 
 // CORS: only allow our frontend(s). FRONTEND_URL may be a comma separated list.
-// Localhost is always allowed for development. Vercel preview deploys can be
-// allowed with ALLOW_VERCEL_PREVIEWS=true.
+// Localhost is always allowed for development.
+// Vercel deployment/preview URLs (e.g. https://quotely-repo-abc123-team.vercel.app)
+// are allowed via ALLOWED_ORIGIN_SUFFIXES, e.g. "-goncasfausto04s-projects.vercel.app".
+// Only use suffixes that belong to YOUR Vercel account/team.
 const allowedOrigins = new Set(
   (process.env.FRONTEND_URL || "")
     .split(",")
     .map((o) => o.trim().replace(/\/+$/, ""))
     .filter(Boolean),
 );
+const allowedSuffixes = (process.env.ALLOWED_ORIGIN_SUFFIXES || "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+const matchesSuffix = (origin) => {
+  try {
+    const { protocol, hostname } = new URL(origin);
+    return protocol === "https:" && allowedSuffixes.some((s) => hostname.toLowerCase().endsWith(s));
+  } catch {
+    return false;
+  }
+};
 app.use(
   cors({
     origin(origin, cb) {
@@ -64,10 +78,11 @@ app.use(
         allowedOrigins.size === 0 ||
         allowedOrigins.has(normalized) ||
         /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized) ||
-        (process.env.ALLOW_VERCEL_PREVIEWS === "true" && /^https:\/\/[\w-]+\.vercel\.app$/.test(normalized))
+        matchesSuffix(normalized)
       ) {
         return cb(null, true);
       }
+      console.warn(`🚫 CORS blocked origin: ${origin} (add it to FRONTEND_URL or ALLOWED_ORIGIN_SUFFIXES)`);
       cb(null, false);
     },
   }),

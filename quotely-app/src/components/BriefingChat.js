@@ -262,6 +262,7 @@ export default function BriefingChat({
         const data = await apiFetch("/start", {
           method: "POST",
           json: { description: userInput, briefingId },
+          retry: true, // safe: /start just (re)initialises the conversation
         });
         setIsConversationStarted(true);
 
@@ -357,7 +358,7 @@ export default function BriefingChat({
       console.error("Error:", error);
       appendMessage({
         role: "AI",
-        content: `❌ Something went wrong: ${error.message}. Please try again.`,
+        content: `❌ ${(error.message || "Something went wrong").replace(/[.\s]+$/, "")}. Please try again.`,
       });
     } finally {
       setIsLoading(false);

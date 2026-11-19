@@ -24,23 +24,34 @@ async function authHeader() {
 }
 
 let warmUpPromise = null;
+let lastConfirmedUp = 0;
+const UP_FRESH_MS = 5 * 60 * 1000;
 
 // Wake the backend (and DB) up as early as possible, e.g. on app load.
-// Resolves true once the server answers, false if it never does.
+// Resolves true once the server answers, false if it never does (~2 min).
+// Note: while Render is starting it answers 502 *without* CORS headers, which
+// the browser reports as a network error, so we just keep polling.
 export function warmUpBackend() {
+  if (Date.now() - lastConfirmedUp < UP_FRESH_MS) return Promise.resolve(true);
   if (!warmUpPromise) {
     warmUpPromise = (async () => {
-      for (let attempt = 0; attempt < 8; attempt++) {
-        try {
-          const res = await fetch(`${API_URL}/health/db`, { signal: AbortSignal.timeout(20000) });
-          if (res.ok || res.status === 503) return true; // server is up even if DB is waking
-        } catch {
-          /* still sleeping */
+      try {
+        for (let attempt = 0; attempt < 12; attempt++) {
+          try {
+            const res = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(20000) });
+            if (res.ok) {
+              lastConfirmedUp = Date.now();
+              return true;
+            }
+          } catch {
+            /* still sleeping / restarting */
+          }
+          await sleep(5000);
         }
-        await sleep(5000);
+        return false;
+      } finally {
+        warmUpPromise = null;
       }
-      warmUpPromise = null;
-      return false;
     })();
   }
   return warmUpPromise;
@@ -61,6 +72,10 @@ export async function apiFetch(path, options = {}) {
   const canRetry = retry ?? (method === "GET" || method === "HEAD");
   const maxAttempts = canRetry ? 4 : 1;
 
+  // Requests that must not be repeated (sending email, chat answers) only go
+  // out once the server is confirmed awake, so they don't die on a cold start.
+  if (!canRetry) await warmUpBackend();
+
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let res;
@@ -79,8 +94,8 @@ export async function apiFetch(path, options = {}) {
     } catch (err) {
       lastError = new ApiError(
         err?.name === "TimeoutError"
-          ? "The server took too long to respond. It may be waking up, please try again."
-          : "Can't reach the Quotely server. It may be waking up (takes up to a minute), please try again.",
+          ? "The server took too long to respond — please try again"
+          : "Can't reach the Quotely server. It may still be starting up (up to a minute) — please try again",
         0,
       );
       if (attempt < maxAttempts) {
@@ -91,7 +106,10 @@ export async function apiFetch(path, options = {}) {
     }
 
     const data = await res.json().catch(() => ({}));
-    if (res.ok) return data;
+    if (res.ok) {
+      lastConfirmedUp = Date.now();
+      return data;
+    }
 
     lastError = new ApiError(data.error || data.details || `Server error (${res.status})`, res.status, data);
     if (canRetry && COLD_START_STATUSES.has(res.status) && attempt < maxAttempts) {
