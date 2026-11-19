@@ -97,6 +97,19 @@ export async function sendEmail({
   }
 }
 
+// Health check: proves the refresh token still works (no email is sent or read).
+// Access tokens are cached ~1h by the client, so calling this often is cheap.
+export async function checkGmailAuth() {
+  const client = getAuthClient();
+  try {
+    const { token } = await client.getAccessToken();
+    if (!token) throw new Error("No access token returned");
+    return true;
+  } catch (err) {
+    throw wrapGmailError(err);
+  }
+}
+
 // Search threads (Gmail query syntax) and return their ids
 export async function searchThreadIds(q, maxResults = 25) {
   const gmail = google.gmail({ version: "v1", auth: getAuthClient() });

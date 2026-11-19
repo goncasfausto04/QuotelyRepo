@@ -12,6 +12,7 @@ import makeAnalyzeRouter from "./routes/analyze.js";
 import makeSupplierRouter from "./routes/supplier.js";
 import makeSearchRouter from "./routes/search.js";
 import { makeRequireAuth } from "./lib/auth.js";
+import { checkGmailAuth } from "./email_gmail.js";
 
 // ---------- Environment ----------
 const requiredEnvVars = ["GEMINI_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"];
@@ -115,6 +116,18 @@ app.get("/health/db", async (req, res) => {
   } catch (err) {
     console.error("❌ DB health check failed:", err.message);
     res.status(503).json({ status: "degraded", db: "unreachable", error: err.message });
+  }
+});
+
+// Checks the Gmail refresh token is still valid. The keep-alive GitHub Action
+// calls this, so a dead token makes the workflow fail and GitHub emails you.
+app.get("/health/email", async (req, res) => {
+  try {
+    await checkGmailAuth();
+    res.json({ status: "ok", email: "ok" });
+  } catch (err) {
+    console.error("❌ Email health check failed:", err.message);
+    res.status(503).json({ status: "degraded", email: "broken", error: err.message });
   }
 });
 

@@ -34,3 +34,17 @@ jobs:
           done
           echo "::error::Backend or database did not respond healthy"
           exit 1
+
+      # Fails the run (GitHub emails you) if the Gmail refresh token died,
+      # so you hear about it before users do.
+      - name: Check Gmail token
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+        run: |
+          [ -z "$BACKEND_URL" ] && exit 0
+          code=$(curl -s -o email.json -w "%{http_code}" --max-time 60 "${BACKEND_URL%/}/health/email" || echo 000)
+          echo "HTTP $code: $(cat email.json 2>/dev/null)"
+          if [ "$code" != "200" ]; then
+            echo "::error::Email is broken: $(cat email.json 2>/dev/null). Fix: cd server && npm run gmail:token, then update GMAIL_API_REFRESH_TOKEN on Render."
+            exit 1
+          fi
