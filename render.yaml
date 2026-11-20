@@ -32,3 +32,7 @@ services:
         sync: false
       - key: GOOGLE_SEARCH_ENGINE_ID
         sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: EMAIL_MODE
+        value: test

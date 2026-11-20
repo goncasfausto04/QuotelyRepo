@@ -64,6 +64,23 @@ token once with `cd server && npm run gmail:token` and update `GMAIL_API_REFRESH
   Set the repo variable `BACKEND_URL` (Settings → Secrets and variables → Actions → Variables).
 - The frontend also wakes the backend on page load and retries safe requests through a cold start.
 
+### Email: test mode vs live mode
+Sending goes through `server/services/mail/` and is switched at **/admin** (setting `email_mode`):
+- **test** (`mail/testMode.js`): nothing reaches suppliers. Each email is sent to the Quotely inbox
+  (`GMAIL_API_SENDER`) and ~5 s later a dummy supplier reply with **999** for every value arrives in the
+  same thread, so inbox → approve → compare can be tested end to end. Dummy text: `mail/dummyReply.js`.
+- **live** (`mail/liveMode.js`): the real implementation, emails go to the suppliers' addresses.
+
+Setup: run `supabase/app_settings.sql` once (so the switch survives restarts) and set `ADMIN_EMAILS`
+on Render to your login email. Replies to a dummy message always stay in test mode.
+
+### Code layout
+- `server/routes/` thin HTTP handlers · `server/services/` logic (mail, threads, conversation, search)
+  · `server/prompts/` every AI prompt · `server/lib/` auth, settings, validation, rate limiting.
+- `quotely-app/src/components/<feature>/` one folder per feature (chat, inbox, analyze, compare,
+  dashboard, admin, ...), each with a hook / api file and small presentational components.
+- Tests: `cd server && npm test` and `cd quotely-app && CI=true npm test`.
+
 ### Database security
 Run `supabase/security.sql` in the Supabase SQL editor to enable Row Level Security.
 The backend verifies the user's Supabase access token on every private endpoint.

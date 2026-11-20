@@ -5,6 +5,8 @@
 // actually owns it, otherwise anyone on the internet could read inboxes, send
 // email from the Quotely Gmail account, or overwrite other users' data.
 
+import { HttpError } from "./http.js";
+
 const TOKEN_CACHE_TTL_MS = 60 * 1000;
 const tokenCache = new Map(); // access token -> { user, expires }
 
@@ -15,13 +17,6 @@ function pruneCache() {
   }
 }
 setInterval(pruneCache, TOKEN_CACHE_TTL_MS).unref();
-
-export class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
 
 // Express middleware: requires `Authorization: Bearer <supabase access token>`.
 // Sets req.user on success.
@@ -88,33 +83,18 @@ export async function getOwnedBriefing(supabase, briefingId, userId, columns = "
   return data;
 }
 
-// Wraps an async route handler so thrown errors become JSON responses
-// instead of unhandled rejections.
-export const asyncRoute = (fn) => (req, res, next) =>
-  Promise.resolve(fn(req, res, next)).catch(next);
+// ---------- Admins ----------
+// Admins are listed by email in the ADMIN_EMAILS env var (comma separated).
+const adminEmails = () =>
+  (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
 
-// Very small in-memory fixed-window rate limiter (per user or IP).
-// Good enough for a single Render instance; resets on restart.
-export function rateLimit({ windowMs, max, keyFn, message }) {
-  const hits = new Map();
-  setInterval(() => {
-    const now = Date.now();
-    for (const [k, v] of hits) if (v.reset <= now) hits.delete(k);
-  }, windowMs).unref();
+export const isAdmin = (user) => !!user?.email && adminEmails().includes(user.email.toLowerCase());
 
-  return (req, res, next) => {
-    const key = keyFn(req);
-    const now = Date.now();
-    let entry = hits.get(key);
-    if (!entry || entry.reset <= now) {
-      entry = { count: 0, reset: now + windowMs };
-      hits.set(key, entry);
-    }
-    entry.count += 1;
-    if (entry.count > max) {
-      res.set("Retry-After", Math.ceil((entry.reset - now) / 1000));
-      return res.status(429).json({ error: message || "Too many requests, slow down" });
-    }
-    next();
-  };
+// Use after requireAuth
+export function requireAdmin(req, res, next) {
+  if (!isAdmin(req.user)) return res.status(403).json({ error: "Admins only" });
+  next();
 }
