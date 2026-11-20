@@ -1,5 +1,6 @@
 import express from "express";
-import { sendEmail, getThreadMessages, searchThreadIds } from "../email_gmail.js";
+import { randomBytes } from "crypto";
+import { sendEmail, getThreadMessages, searchThreadIds, checkGmailAuth } from "../email_gmail.js";
 import { getOwnedBriefing, asyncRoute, rateLimit, HttpError } from "../lib/auth.js";
 
 const EMAIL_RE = /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[^\s@<>(),;:"]+$/;
@@ -32,6 +33,26 @@ async function findBriefingThreadIds(briefingId, legacyThreadId) {
   return [...ids];
 }
 
+const frontendUrl = () =>
+  (process.env.FRONTEND_URL || "http://localhost:3000").split(",")[0].trim().replace(/\/+$/, "");
+
+// Public link where suppliers can submit their quote through a form (created on first use)
+async function getSupplierLink(supabase, briefingId) {
+  const { data, error } = await supabase
+    .from("briefings")
+    .select("supplier_link_token")
+    .eq("id", briefingId)
+    .single();
+  if (error) throw new HttpError(500, `Failed to load briefing: ${error.message}`);
+  let token = data?.supplier_link_token;
+  if (!token) {
+    token = randomBytes(32).toString("hex");
+    const { error: upErr } = await supabase.from("briefings").update({ supplier_link_token: token }).eq("id", briefingId);
+    if (upErr) throw new HttpError(500, `Failed to create supplier link: ${upErr.message}`);
+  }
+  return `${frontendUrl()}/supplier-response/${token}`;
+}
+
 export default function makeEmailRouter({ supabase, requireAuth }) {
   const router = express.Router();
 
@@ -42,29 +63,48 @@ export default function makeEmailRouter({ supabase, requireAuth }) {
     message: "Email limit reached (40 per hour). Try again later.",
   });
 
+  // GET /api/email/status -> is sending configured and working?
+  router.get(
+    "/email/status",
+    requireAuth,
+    asyncRoute(async (req, res) => {
+      const sender = process.env.GMAIL_API_SENDER || null;
+      try {
+        await checkGmailAuth();
+        res.json({ ok: true, sender });
+      } catch (err) {
+        res.json({ ok: false, sender, error: err.message });
+      }
+    }),
+  );
+
   // POST /api/send-email
-  // body: { briefingId, subject, body, recipients[], isHtml, replyToMessageId? }
+  // body: { briefingId, subject, body, recipients[], isHtml, replyToMessageId?, includeSupplierLink? }
+  // New requests are sent as ONE EMAIL PER RECIPIENT, so suppliers don't see
+  // each other and every supplier gets their own thread in the inbox.
   router.post(
     "/send-email",
     requireAuth,
     sendLimiter,
     asyncRoute(async (req, res) => {
-      const { subject, body, recipients, isHtml, briefingId, replyToMessageId } = req.body || {};
+      const { subject, body, recipients, isHtml, briefingId, replyToMessageId, includeSupplierLink } = req.body || {};
 
       if (typeof body !== "string" || !body.trim()) throw new HttpError(400, "Email body is required");
       if (body.length > MAX_BODY) throw new HttpError(400, "Email body is too long");
       if (!Array.isArray(recipients) || recipients.length === 0)
         throw new HttpError(400, "At least one recipient is required");
       if (recipients.length > MAX_RECIPIENTS)
-        throw new HttpError(400, `At most ${MAX_RECIPIENTS} recipients per email`);
+        throw new HttpError(400, `At most ${MAX_RECIPIENTS} recipients per send`);
 
       const addresses = recipients.map(extractAddress);
       const invalid = recipients.filter((_, i) => !addresses[i]);
       if (invalid.length) throw new HttpError(400, `Invalid email address: ${invalid.join(", ")}`);
+      const unique = [...new Set(addresses.map((a) => a.toLowerCase()))];
 
       const briefing = await getOwnedBriefing(supabase, briefingId, req.user.id, "id, gmail_thread_id");
 
-      let sendSubject = (typeof subject === "string" && subject.trim()) || "Quote Request from Quotely";
+      let sendSubject = (typeof subject === "string" && subject.trim().slice(0, 300)) || "Quote Request";
+      let sendBody = body;
       let threadId, inReplyTo, references;
 
       // Replying from the inbox: keep the reply inside the supplier's thread
@@ -82,32 +122,51 @@ export default function makeEmailRouter({ supabase, requireAuth }) {
             break;
           }
         }
+      } else if (includeSupplierLink) {
+        const link = await getSupplierLink(supabase, briefing.id);
+        sendBody += `\n\n---\nYou can reply to this email, or submit your quote online here:\n${link}`;
       }
 
       sendSubject = withRefTag(sendSubject, briefing.id);
+      const from = process.env.GMAIL_API_SENDER || "me";
 
-      const result = await sendEmail({
-        from: process.env.GMAIL_API_SENDER || "me",
-        to: addresses,
-        subject: sendSubject,
-        body,
-        isHtml: !!isHtml,
-        threadId,
-        inReplyTo,
-        references,
-      });
+      // Replies go to everyone in one message; new requests are sent individually
+      const batches = replyToMessageId ? [unique] : unique.map((a) => [a]);
+      const sent = [];
+      const failed = [];
+      let firstThreadId = null;
 
-      const newThreadId = result?.threadId || null;
+      for (const to of batches) {
+        try {
+          const result = await sendEmail({ from, to, subject: sendSubject, body: sendBody, isHtml: !!isHtml, threadId, inReplyTo, references });
+          firstThreadId ||= result?.threadId || null;
+          sent.push(...to);
+        } catch (err) {
+          // Config/auth problems will fail for everyone: stop and report clearly
+          if (err?.status === 503) {
+            if (sent.length === 0) throw err;
+            failed.push(...to.map((t) => ({ to: t, error: err.message })));
+            break;
+          }
+          console.error("❌ send failed for", to.join(", "), err.message);
+          failed.push(...to.map((t) => ({ to: t, error: err.message || "Send failed" })));
+        }
+      }
+
+      if (sent.length === 0) {
+        throw new HttpError(502, `Email could not be sent: ${failed[0]?.error || "unknown error"}`);
+      }
+
       // Keep the legacy column populated (first thread wins) for older data
-      if (newThreadId && !briefing.gmail_thread_id) {
+      if (firstThreadId && !briefing.gmail_thread_id) {
         const { error } = await supabase
           .from("briefings")
-          .update({ gmail_thread_id: newThreadId })
+          .update({ gmail_thread_id: firstThreadId })
           .eq("id", briefing.id);
         if (error) console.warn("⚠️  Failed to persist gmail_thread_id:", error.message);
       }
 
-      res.json({ ok: true, threadId: newThreadId, messageId: result?.id || null });
+      res.json({ ok: true, sent, failed, threadId: firstThreadId });
     }),
   );
 

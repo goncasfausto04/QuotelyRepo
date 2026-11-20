@@ -128,6 +128,26 @@ function decodeBase64Url(input = "") {
   return Buffer.from(s + "=".repeat(pad), "base64").toString("utf8");
 }
 
+// Very small HTML -> text conversion so HTML-only emails are readable
+export function htmlToText(html = "") {
+  return String(html)
+    .replace(/<(script|style|head)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|tr|li|h[1-6]|blockquote)>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 // Find a part with a specific MIME type in the message parts (recursive)
 function findPartWithMime(parts, mimeType) {
   if (!parts) return null;
@@ -163,11 +183,12 @@ export async function getThreadMessages(threadId) {
     let body = "";
     if (msg.payload?.body?.data) {
       body = decodeBase64Url(msg.payload.body.data);
+      if (/html/i.test(msg.payload.mimeType || "")) body = htmlToText(body);
     } else {
-      const part =
-        findPartWithMime(msg.payload?.parts, "text/plain") ||
-        findPartWithMime(msg.payload?.parts, "text/html");
-      if (part) body = decodeBase64Url(part.body.data);
+      const plain = findPartWithMime(msg.payload?.parts, "text/plain");
+      const html = plain ? null : findPartWithMime(msg.payload?.parts, "text/html");
+      if (plain) body = decodeBase64Url(plain.body.data);
+      else if (html) body = htmlToText(decodeBase64Url(html.body.data));
     }
 
     return {
