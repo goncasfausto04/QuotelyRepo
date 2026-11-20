@@ -58,10 +58,7 @@ export function loadConversation(briefing) {
 export async function saveConversation(supabase, briefingId, conv) {
   const { error } = await supabase
     .from("briefings")
-    .update({
-      conversation_state: conv,
-      conversation_finished: conv.done,
-    })
+    .update({ conversation_state: conv }) // conv.done marks a finished interview
     .eq("id", briefingId);
   if (error) throw new HttpError(500, `Failed to save conversation: ${error.message}`);
 }

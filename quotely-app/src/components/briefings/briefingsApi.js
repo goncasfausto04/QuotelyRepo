@@ -6,7 +6,7 @@ export async function loadBriefings() {
   if (!auth?.user) return [];
   const { data, error } = await supabase
     .from("briefings")
-    .select("id, title, created_at, conversation_finished")
+    .select("id, title, created_at")
     .eq("user_auth_id", auth.user.id)
     .order("created_at", { ascending: false });
   if (error) throw error;

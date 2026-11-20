@@ -37,7 +37,7 @@ export function makeChatSaver(briefingId) {
 export async function resetBriefingConversation(briefingId) {
   const { error } = await supabase
     .from("briefings")
-    .update({ chat: [GREETING], conversation_state: null, conversation_finished: false })
+    .update({ chat: [GREETING], conversation_state: null })
     .eq("id", briefingId);
   if (error) throw error;
 }
