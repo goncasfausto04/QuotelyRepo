@@ -32,7 +32,7 @@ export default function SupplierFinder({ briefingId, defaultLocation, contacted 
 
   return (
     <div className="space-y-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-4">
+      <div className="card p-4">
         <form
           className="flex flex-col sm:flex-row gap-2"
           onSubmit={(e) => {
@@ -44,14 +44,14 @@ export default function SupplierFinder({ briefingId, defaultLocation, contacted 
             value={where}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="City, region or country (empty = anywhere)"
-            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input flex-1"
           />
-          <button type="submit" disabled={s.searching} className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
+          <button type="submit" disabled={s.searching} className="btn-primary">
             <Search size={16} /> {s.searching ? "Searching the web… (up to a minute)" : s.suppliers.length ? "Search again" : "Find suppliers"}
           </button>
         </form>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          Searches the web for companies that match this briefing's requirements. Blue = has an email, grey = no email found, green = selected.
+          Searches the web for companies that match this briefing's requirements. Dark blue = has an email, grey = no email found, green = selected.
         </p>
       </div>
 
@@ -96,7 +96,7 @@ export default function SupplierFinder({ briefingId, defaultLocation, contacted 
         <div className="sticky bottom-4 z-10">
           <button
             onClick={() => onSend([...selected.values()].map((x) => ({ name: x.name, email: x.contact_email })))}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold bg-green-600 text-white shadow-lg hover:bg-green-700"
+            className="btn-primary w-full py-3"
           >
             <Send size={18} /> Send request to {selected.size} supplier{selected.size === 1 ? "" : "s"}
           </button>

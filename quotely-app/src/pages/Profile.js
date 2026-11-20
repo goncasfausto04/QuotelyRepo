@@ -59,17 +59,17 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
       <div className="max-w-2xl mx-auto space-y-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700 flex items-center gap-5">
+        <div className="card p-6 flex items-center gap-5">
           <AvatarUpload url={profile.photo_url} onUpload={changePhoto} />
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white truncate">{profile.name || "Your profile"}</h1>
+            <h1 className="page-title truncate">{profile.name || "Your profile"}</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 truncate">
               <Mail className="w-4 h-4" /> {profile.email}
             </p>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700 space-y-4">
+        <div className="card p-6 space-y-4">
           <Notice type="info">These details are used to sign the quote request emails sent to suppliers. Leave a field empty to keep it out of emails.</Notice>
           {FIELDS.map(([key, label, Icon, placeholder]) => (
             <label key={key} className="block">
@@ -80,7 +80,7 @@ export default function Profile() {
                 value={profile[key] || ""}
                 onChange={(e) => setProfile((p) => ({ ...p, [key]: e.target.value }))}
                 placeholder={placeholder}
-                className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input"
               />
             </label>
           ))}
@@ -91,7 +91,7 @@ export default function Profile() {
             </Notice>
           )}
 
-          <button onClick={save} disabled={saving} className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
+          <button onClick={save} disabled={saving} className="btn-primary w-full">
             <Check className="w-5 h-5" /> {saving ? "Saving…" : "Save profile"}
           </button>
         </div>

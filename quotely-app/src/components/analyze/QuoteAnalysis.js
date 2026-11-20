@@ -1,7 +1,7 @@
 // Analyze tab: add a quote from a pasted email, a PDF, or by hand.
 
 import { useCallback, useEffect, useState } from "react";
-import { FileText, Upload, Link as LinkIcon } from "lucide-react";
+import { FileText, Upload, PenLine, Link as LinkIcon } from "lucide-react";
 import { apiFetch } from "../../api.js";
 import { analyzeEmailText, analyzePdf, insertQuote, listQuotes, deleteQuote } from "../../lib/quotes.js";
 import Notice from "../ui/Notice.js";
@@ -13,9 +13,9 @@ import QuoteList from "./QuoteList.js";
 import SupplierLinkModal from "./SupplierLinkModal.js";
 
 const MODES = [
-  ["email", "Email", FileText],
+  ["email", "Paste email", FileText],
   ["pdf", "PDF", Upload],
-  ["manual", "Manual", null],
+  ["manual", "Type it in", PenLine],
 ];
 
 export default function QuoteAnalysis({ briefingId }) {
@@ -97,24 +97,24 @@ export default function QuoteAnalysis({ briefingId }) {
       {supplierLink && <SupplierLinkModal link={supplierLink} onClose={() => setSupplierLink(null)} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white">➕ Add a quote</h3>
-            <button onClick={openSupplierLink} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-green-600 text-white hover:bg-green-700">
+            <h3 className="section-title">Add a quote</h3>
+            <button onClick={openSupplierLink} className="btn-secondary">
               <LinkIcon size={14} /> Supplier form link
             </button>
           </div>
 
-          <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-700 pb-4">
+          <div className="flex mb-5 rounded-md border border-gray-300 dark:border-gray-700 overflow-hidden">
             {MODES.map(([id, label, Icon]) => (
               <button
                 key={id}
                 onClick={() => setMode(id)}
-                className={`flex-1 py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 ${
-                  mode === id ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                className={`flex-1 py-2 px-3 text-sm flex items-center justify-center gap-2 border-r last:border-r-0 border-gray-300 dark:border-gray-700 ${
+                  mode === id ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900" : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
-                {Icon ? <Icon size={16} /> : "✍️"} {label}
+                <Icon size={16} /> {label}
               </button>
             ))}
           </div>

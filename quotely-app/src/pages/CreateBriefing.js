@@ -51,47 +51,38 @@ export default function CreateBriefing() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-6">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-lg p-8 border border-gray-200 dark:border-gray-700">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">
-          Create New Briefing
-        </h1>
+    <div className="px-4 py-10 sm:py-16">
+      <div className="card w-full max-w-lg mx-auto p-6 sm:p-8">
+        <h1 className="page-title">New request</h1>
+        <p className="muted mb-6">Give it a name you'll recognise. Next, the assistant asks a few questions and writes the email to suppliers.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-gray-600 dark:text-gray-300 mb-1">
-              Title
+            <label className="label" htmlFor="title">
+              Name
             </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white p-2 rounded-md focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-              placeholder="e.g. Office Renovation"
-            />
+            <input id="title" value={title} onChange={(e) => setTitle(e.target.value)} required className="input" placeholder="e.g. T-shirts for the summer event" />
           </div>
-
           <div>
-            <label className="block text-gray-600 dark:text-gray-300 mb-1">
-              Category
+            <label className="label" htmlFor="category">
+              Category <span className="font-normal text-gray-400">(optional)</span>
             </label>
             <input
-              type="text"
+              id="category"
+              list="categories"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white p-2 rounded-md focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-              placeholder="e.g. Construction"
+              className="input"
+              placeholder="e.g. Printing"
             />
+            <datalist id="categories">
+              {["Printing", "Merchandise", "Construction", "Furniture", "IT equipment", "Catering", "Packaging", "Services"].map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
           </div>
-
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-md hover:bg-blue-700 dark:hover:bg-blue-800 disabled:opacity-50"
-          >
-            {loading ? "Creating..." : "Create Briefing"}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button type="submit" disabled={loading} className="btn-primary w-full">
+            {loading ? "Creating…" : "Continue"}
           </button>
         </form>
       </div>

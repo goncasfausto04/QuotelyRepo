@@ -13,7 +13,7 @@ export default function WeightConfiguration({ availableParams, onWeightsApplied,
   const update = (key, changes) => setWeights((w) => ({ ...w, [key]: { ...w[key], ...changes } }));
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+    <div className="card p-4 sm:p-6">
       <div className="flex items-start justify-between mb-5 gap-3">
         <div className="flex items-center gap-3">
           <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-lg">
@@ -44,19 +44,18 @@ export default function WeightConfiguration({ availableParams, onWeightsApplied,
       </div>
 
       <div className="mt-6 flex flex-col sm:flex-row gap-2">
-        <button onClick={() => setWeights(defaultWeights(availableParams))} className="px-4 py-2 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-lg hover:bg-red-200">
-          🔄 Reset all
+        <button onClick={() => setWeights(defaultWeights(availableParams))} className="btn-ghost">Reset all
         </button>
         <button
           onClick={() => setWeights((w) => setAllWeights(w, 1))}
-          className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2"
+          className="btn-secondary"
         >
           <Zap size={16} /> All equal
         </button>
         <button
           onClick={() => canApply && onWeightsApplied(weights)}
           disabled={!canApply}
-          className="sm:ml-auto px-6 py-2.5 font-semibold rounded-lg flex items-center justify-center gap-2 bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+          className="btn-primary sm:ml-auto"
         >
           <CheckCircle size={18} /> Apply
         </button>

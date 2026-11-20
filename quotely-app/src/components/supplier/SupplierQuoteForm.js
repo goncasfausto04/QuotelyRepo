@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 
-const input =
-  "w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500";
+const input = "input py-2.5";
 
 // [key, label, type, options] grouped in rows
 const ROWS = [
@@ -69,9 +68,9 @@ export default function SupplierQuoteForm({ onSubmit }) {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full py-4 rounded-lg font-semibold text-lg bg-blue-600 text-white hover:bg-blue-700 shadow-lg disabled:bg-gray-300 disabled:text-gray-500"
+        className="btn-primary w-full py-3 text-base"
       >
-        {submitting ? "Submitting..." : "📤 Submit quote"}
+        {submitting ? "Submitting..." : "Submit quote"}
       </button>
     </form>
   );

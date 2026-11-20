@@ -10,8 +10,7 @@ import EmailModeBanner from "./EmailModeBanner.js";
 import { splitSubject, lower } from "./emailUtils.js";
 import { sendEmail } from "./inboxApi.js";
 
-const inputCls =
-  "w-full p-2.5 border rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500";
+const inputCls = "input";
 
 export default function EmailComposer({ briefingId, briefingTitle, generatedEmail = "", suggestions = [], contacted = [], emailStatus, presetRecipients, onSent }) {
   const generated = useMemo(() => splitSubject(generatedEmail), [generatedEmail]);
@@ -90,7 +89,7 @@ export default function EmailComposer({ briefingId, briefingTitle, generatedEmai
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
+    <div className="card p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -165,7 +164,7 @@ export default function EmailComposer({ briefingId, briefingTitle, generatedEmai
           type="button"
           onClick={send}
           disabled={!canSend}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold transition bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-200 dark:disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
+          className="btn-primary px-5"
         >
           <Send size={16} />
           {sending ? "Sending…" : recipients.length > 1 ? `Send to ${recipients.length} suppliers` : "Send"}
@@ -174,7 +173,7 @@ export default function EmailComposer({ briefingId, briefingTitle, generatedEmai
           type="button"
           onClick={() => navigator.clipboard?.writeText(`Subject: ${subject}\n\n${body}`).then(() => setResult({ type: "success", text: "Copied to clipboard" }))}
           disabled={!body.trim()}
-          className="flex items-center gap-1 px-4 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+          className="btn-secondary"
         >
           <Copy size={14} /> Copy
         </button>

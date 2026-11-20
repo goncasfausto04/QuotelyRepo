@@ -78,7 +78,7 @@ export default function ConversationsView({ briefingId, inbox, composerOpen, set
       )}
 
       {!inbox.error && inbox.threads.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-8 text-center">
+        <div className="card p-8 text-center">
           <Mail className="mx-auto text-gray-400 dark:text-gray-500 mb-3" size={40} />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">No conversations yet</h3>
           <p className="text-gray-600 dark:text-gray-400 text-sm">Send a quote request above. Supplier replies appear here automatically.</p>

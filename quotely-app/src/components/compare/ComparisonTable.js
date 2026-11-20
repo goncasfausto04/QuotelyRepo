@@ -1,117 +1,76 @@
-// Desktop table: one column per quote. "overview" shows values, "calculations"
-// shows how each weighted score was computed.
+// Side-by-side table: one column per supplier (in ranking order), the best
+// value of each row marked, the others showing how far they are from it.
 
-import { formatBusinessRating, money, INPUT_METHOD_LABELS } from "./scoring.js";
+import { visibleRows } from "./rows.js";
+import { bestOf } from "./scoring.js";
 
-const cell = "py-3 px-2 text-center text-xs text-gray-700 dark:text-gray-300";
-const labelCell = "py-3 font-medium text-gray-700 dark:text-gray-300 text-xs";
-
-function Rating({ quote }) {
-  const r = formatBusinessRating(quote);
-  if (!r) return "—";
-  return r.url ? (
-    <a href={r.url} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
-      {r.text}
-    </a>
-  ) : (
-    r.text
+function Cell({ row, quote, best, currency }) {
+  const v = row.get(quote);
+  const isBest = best != null && v != null && v === best;
+  const showDelta = best != null && v != null && !isBest && row.delta;
+  return (
+    <td
+      className={`px-4 py-3 align-top ${row.text ? "text-sm text-gray-700 dark:text-gray-300" : "num"} ${
+        isBest ? "bg-green-50 dark:bg-green-950/40" : ""
+      }`}
+    >
+      <div className={`${row.primary ? "text-base font-semibold" : "text-sm"} ${v == null ? "text-gray-400" : "text-gray-900 dark:text-gray-100"}`}>
+        {row.format(v, currency, quote)}
+      </div>
+      {row.key === "total" && v != null && quote.std.shipping == null && (
+        <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">shipping not stated</div>
+      )}
+      {isBest && <div className="text-xs font-medium text-green-700 dark:text-green-400 mt-0.5">Best</div>}
+      {showDelta && <div className="text-xs text-gray-500 mt-0.5">{row.delta(v, best, currency)}</div>}
+    </td>
   );
 }
 
-// [label, render(quote)]
-const OVERVIEW_ROWS = [
-  ["Business rating", (q) => <Rating quote={q} />],
-  ["Price", (q) => <span className="font-semibold">{money(q.total_price, q.currency)}</span>],
-  ["Lead time", (q) => (q.lead_time_days ? `${q.lead_time_days}d` : "—")],
-  ["Warranty (months)", (q) => (q.warranty_months != null ? `${q.warranty_months}m` : "—")],
-  ["Warranty details", (q) => q.warranty_period || "—"],
-  ["Shipping cost", (q) => (q.shipping_cost != null ? money(q.shipping_cost, q.currency) : "—")],
-  ["Payment terms", (q) => q.payment_terms || "—"],
-];
-
-function CalculationRows({ quotes, params }) {
+export default function ComparisonTable({ quotes, currency, ranked }) {
+  const rows = visibleRows(quotes);
   return (
-    <>
-      {params.map((p) => (
-        <tr key={p.key} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-          <td className={labelCell}>{p.name}</td>
-          {quotes.map((q) => {
-            const ps = q.parameterScores?.[p.key];
-            return (
-              <td key={q.id} className={cell} title={ps ? `min=${ps.min} max=${ps.max}` : "No data"}>
-                {ps ? (
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span>{ps.originalValue}</span>
-                    <span className="text-gray-500 dark:text-gray-400">
-                      n={ps.normalizedScore.toFixed(2)} w={ps.weight}
-                    </span>
-                    <span className="text-gray-500 dark:text-gray-400">contrib={ps.rawContribution.toFixed(2)}</span>
-                  </div>
-                ) : (
-                  "—"
-                )}
-              </td>
-            );
-          })}
-        </tr>
-      ))}
-      <tr className="bg-gray-50 dark:bg-gray-700/40 border-t border-gray-200 dark:border-gray-600">
-        <td className={`${labelCell} font-bold`}>Final weighted sum</td>
-        {quotes.map((q) => (
-          <td key={q.id} className={`${cell} font-semibold`}>
-            {q.totalWeights > 0 ? (
-              <div className="flex flex-col items-center gap-0.5">
-                <span>{q.rawWeightedSum.toFixed(2)}</span>
-                <span className="text-gray-500 dark:text-gray-400">/ {q.totalWeights.toFixed(2)}</span>
-                <span className="text-blue-600 dark:text-blue-400 font-medium">{Math.round(q.score)}%</span>
-              </div>
-            ) : (
-              "—"
-            )}
-          </td>
-        ))}
-      </tr>
-    </>
-  );
-}
-
-export default function ComparisonTable({ quotes, params, view, hasWeights }) {
-  return (
-    <div className="hidden md:block overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
-      <table className="w-full text-sm table-auto border-collapse bg-white dark:bg-gray-800">
+    <div className="card overflow-x-auto">
+      <table className="w-full text-left border-collapse">
         <thead>
-          <tr className="border-b border-gray-200 dark:border-gray-700">
-            <th className="text-left py-3 px-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Metric</th>
+          <tr className="border-b border-gray-200 dark:border-gray-800">
+            <th className="sticky left-0 z-10 bg-white dark:bg-gray-900 px-4 py-3 w-44 min-w-[11rem]" />
             {quotes.map((q, i) => (
-              <th key={q.id} className="text-center py-3 px-2">
-                <div className="flex flex-col items-center">
-                  <span className="font-semibold text-gray-900 dark:text-white text-xs" title={q.supplier_name || ""}>
-                    {q.supplier_name?.split(" ")[0] || `S${i + 1}`}
-                  </span>
-                  {hasWeights && q.score != null && (
-                    <span className="text-xs text-purple-600 dark:text-purple-400 font-medium mt-1">{Math.round(q.score)}%</span>
-                  )}
-                  <span className="text-xs italic text-gray-500">{INPUT_METHOD_LABELS[q.input_method] || "—"}</span>
-                </div>
+              <th key={q.id} className="px-4 py-3 align-bottom min-w-[10rem]">
+                {ranked && q.score != null && <div className="text-xs font-medium text-gray-500 num">#{i + 1} · {Math.round(q.score)} pts</div>}
+                <div className="font-semibold text-gray-900 dark:text-white leading-snug">{q.supplier_name || `Supplier ${i + 1}`}</div>
+                {ranked && q.score != null && (
+                  <div className="mt-2 h-1 rounded bg-gray-200 dark:bg-gray-800">
+                    <div className="h-1 rounded bg-blue-600" style={{ width: `${Math.max(4, q.score)}%` }} />
+                  </div>
+                )}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-          {view === "calculations" && hasWeights ? (
-            <CalculationRows quotes={quotes} params={params} />
-          ) : (
-            OVERVIEW_ROWS.map(([label, render]) => (
-              <tr key={label} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                <td className={labelCell}>{label}</td>
+        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          {rows.map((row) => {
+            const best = row.better ? bestOf(quotes.map(row.get), row.better) : null;
+            return (
+              <tr key={row.key}>
+                <th scope="row" className="sticky left-0 z-10 bg-white dark:bg-gray-900 px-4 py-3 align-top text-sm font-medium text-gray-600 dark:text-gray-400" title={row.hint}>
+                  {row.label}
+                </th>
                 {quotes.map((q) => (
-                  <td key={q.id} className={cell} style={{ whiteSpace: "normal" }}>
-                    {render(q)}
-                  </td>
+                  <Cell key={q.id} row={row} quote={q} best={best} currency={currency} />
                 ))}
               </tr>
-            ))
-          )}
+            );
+          })}
+          <tr>
+            <th scope="row" className="sticky left-0 bg-white dark:bg-gray-900 px-4 py-3 align-top text-sm font-medium text-gray-600 dark:text-gray-400">
+              Notes
+            </th>
+            {quotes.map((q) => (
+              <td key={q.id} className="px-4 py-3 align-top text-xs text-gray-500">
+                {q.std.flags.length ? q.std.flags.join("; ") : "—"}
+              </td>
+            ))}
+          </tr>
         </tbody>
       </table>
     </div>

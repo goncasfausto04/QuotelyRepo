@@ -4,7 +4,7 @@ import { AlertCircle } from "lucide-react";
 export default function ConfirmDialog({ title, children, confirmLabel = "Delete", onConfirm, onCancel }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={onCancel}>
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-md w-full p-6 border border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-4 mb-6">
           <div className="bg-red-100 dark:bg-red-900/30 rounded-full p-3">
             <AlertCircle className="text-red-600 dark:text-red-400" size={24} />

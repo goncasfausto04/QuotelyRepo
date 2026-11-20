@@ -29,11 +29,11 @@ export default function BriefingChat({ briefingId, onGoToInbox }) {
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto p-4 sm:p-6 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg bg-white dark:bg-gray-800">
+    <div className="card w-full max-w-3xl mx-auto p-4 sm:p-6">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Quote request assistant</h2>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
+          <h2 className="section-title">Your request</h2>
+          <p className="muted">
             {chat.phase === "done"
               ? "Your email is ready. Ask for changes below, or find suppliers to send it to."
               : "Answer a few quick questions and I'll write a professional quote request."}
@@ -49,7 +49,7 @@ export default function BriefingChat({ briefingId, onGoToInbox }) {
       <ProfileHint />
       {chat.phase === "interview" && <RequirementsCard spec={chat.spec} />}
 
-      <div ref={scrollRef} className="mb-3 h-[22rem] sm:h-[28rem] overflow-y-auto rounded-lg p-3 bg-gray-50 dark:bg-gray-900">
+      <div ref={scrollRef} className="mb-3 h-[22rem] sm:h-[28rem] overflow-y-auto rounded-md border border-gray-100 dark:border-gray-800 p-3">
         {visible.map((m, i) => (
           <ChatMessage
             key={i}

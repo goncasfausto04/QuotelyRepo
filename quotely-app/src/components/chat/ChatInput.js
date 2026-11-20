@@ -36,13 +36,13 @@ export default function ChatInput({ phase, disabled, onSend }) {
         }}
         placeholder={disabled ? "Please wait…" : PLACEHOLDERS[phase]}
         disabled={disabled}
-        className="flex-1 resize-none max-h-40 border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-xl p-3 focus:border-blue-500 focus:outline-none disabled:opacity-60"
+        className="input flex-1 resize-none max-h-40 py-3 disabled:opacity-60"
         aria-label="Message"
       />
       <button
         onClick={submit}
         disabled={disabled || !text.trim()}
-        className="h-12 px-5 rounded-xl font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
+        className="btn-primary h-12 px-5"
         aria-label="Send"
       >
         <Send size={18} />

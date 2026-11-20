@@ -18,19 +18,19 @@ export default function EmailCard({ text, faded, actions }) {
 
   return (
     <div
-      className={`my-3 rounded-xl border bg-white dark:bg-gray-800 border-green-300 dark:border-green-700 shadow-sm ${
+      className={`my-3 rounded-lg border bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 ${
         faded ? "opacity-50" : ""
       }`}
     >
-      <div className="px-4 py-2 border-b border-green-200 dark:border-green-800 text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">
-        {faded ? "Previous version" : "Your quote request email"}
+      <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-800 text-xs font-medium text-gray-500">
+        {faded ? "Previous version" : "Email to suppliers"}
       </div>
       <pre className="px-4 py-3 whitespace-pre-wrap break-words font-sans text-sm text-gray-900 dark:text-gray-100">{text}</pre>
       {actions && (
         <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex flex-wrap gap-2">
           <button
             onClick={actions.onFind}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700"
+            className="btn-primary"
           >
             <MapPin size={14} /> Find suppliers
           </button>

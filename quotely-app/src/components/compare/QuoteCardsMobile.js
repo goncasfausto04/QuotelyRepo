@@ -1,52 +1,38 @@
-import { useState } from "react";
-import { formatBusinessRating, money, INPUT_METHOD_LABELS } from "./scoring.js";
+// Phone layout: one card per supplier with the same rows as the table.
 
-export default function QuoteCardsMobile({ quotes }) {
-  const [open, setOpen] = useState({});
+import { visibleRows } from "./rows.js";
+import { bestOf } from "./scoring.js";
+
+export default function QuoteCardsMobile({ quotes, currency, ranked }) {
+  const rows = visibleRows(quotes);
+  const bests = Object.fromEntries(rows.map((r) => [r.key, r.better ? bestOf(quotes.map(r.get), r.better) : null]));
 
   return (
-    <div className="md:hidden space-y-4">
-      {quotes.map((q) => {
-        const rating = formatBusinessRating(q);
-        return (
-          <div key={q.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h4 className="font-semibold text-gray-900 dark:text-white">{q.supplier_name || "Unknown supplier"}</h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{INPUT_METHOD_LABELS[q.input_method] || "—"}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-semibold text-sm text-gray-900 dark:text-white">{money(q.total_price, q.currency)}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{q.lead_time_days ? `${q.lead_time_days}d` : "—"}</p>
-              </div>
-            </div>
-            {open[q.id] && (
-              <div className="mt-3 text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                {rating && (
-                  <p>
-                    <strong>Rating:</strong> {rating.text}
-                  </p>
-                )}
-                <p>
-                  <strong>Warranty:</strong> {q.warranty_months != null ? `${q.warranty_months}m` : "—"}
-                </p>
-                <p>
-                  <strong>Shipping:</strong> {q.shipping_cost != null ? money(q.shipping_cost, q.currency) : "—"}
-                </p>
-                <p>
-                  <strong>Payment:</strong> {q.payment_terms || "—"}
-                </p>
-              </div>
-            )}
-            <button
-              onClick={() => setOpen((o) => ({ ...o, [q.id]: !o[q.id] }))}
-              className="mt-3 w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-600"
-            >
-              {open[q.id] ? "Hide details" : "Details"}
-            </button>
+    <div className="space-y-3">
+      {quotes.map((q, i) => (
+        <div key={q.id} className="card p-4">
+          <div className="flex items-baseline justify-between gap-2 mb-3">
+            <h3 className="font-semibold text-gray-900 dark:text-white">{q.supplier_name || `Supplier ${i + 1}`}</h3>
+            {ranked && q.score != null && <span className="text-xs text-gray-500 num">#{i + 1} · {Math.round(q.score)} pts</span>}
           </div>
-        );
-      })}
+          <dl className="divide-y divide-gray-100 dark:divide-gray-800">
+            {rows.map((r) => {
+              const v = r.get(q);
+              const isBest = bests[r.key] != null && v === bests[r.key];
+              return (
+                <div key={r.key} className="flex justify-between gap-3 py-1.5 text-sm">
+                  <dt className="text-gray-500">{r.label}</dt>
+                  <dd className={`text-right num ${r.primary ? "font-semibold" : ""} ${isBest ? "text-green-700 dark:text-green-400" : "text-gray-900 dark:text-gray-100"}`}>
+                    {r.format(v, currency, q)}
+                    {isBest && " ✓"}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+          {q.std.flags.length > 0 && <p className="text-xs text-gray-500 mt-2">{q.std.flags.join("; ")}</p>}
+        </div>
+      ))}
     </div>
   );
 }

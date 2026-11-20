@@ -3,9 +3,9 @@ import { INPUT_METHOD_LABELS, money, formatBusinessRating } from "../compare/sco
 
 export default function QuoteList({ quotes, loading, onRefresh, onDelete, compareHref }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700">
+    <div className="card p-6">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-bold text-gray-800 dark:text-white">📋 Saved quotes ({quotes.length})</h3>
+        <h3 className="section-title">Saved quotes ({quotes.length})</h3>
         <button
           onClick={onRefresh}
           disabled={loading}
@@ -17,7 +17,7 @@ export default function QuoteList({ quotes, loading, onRefresh, onDelete, compar
 
       {quotes.length === 0 ? (
         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          <div className="text-4xl mb-4">📭</div>
+          <div className="text-4xl mb-4"></div>
           <p>No quotes yet</p>
         </div>
       ) : (
@@ -57,8 +57,7 @@ export default function QuoteList({ quotes, loading, onRefresh, onDelete, compar
       )}
 
       {quotes.length > 0 && (
-        <a href={compareHref} className="block text-center w-full mt-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
-          📊 Compare all quotes
+        <a href={compareHref} className="btn-secondary w-full mt-5">Compare all quotes
         </a>
       )}
     </div>

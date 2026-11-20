@@ -39,14 +39,14 @@ export default function Dashboard() {
 
   const best = stats.bestQuote;
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+    <div className="py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400">An overview of your briefings and quotes.</p>
+        <div className="mb-6">
+          <h1 className="page-title">Overview</h1>
+          <p className="muted">Your requests and the quotes you've received.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard label="Total briefings" value={stats.totalBriefings} icon={FileText} color="blue" footer={`${stats.activeBriefings} with quotes`} />
           <StatCard label="Total quotes" value={stats.totalQuotes} icon={BarChart3} color="purple" footer={`${stats.avgQuotesPerBriefing} per briefing on average`} />
           <StatCard label="Avg time to first quote" value={stats.avgResponseTime} unit="days" icon={Clock} color="orange" />
@@ -65,7 +65,7 @@ export default function Dashboard() {
               <VerticalBars data={stats.quoteTrends} empty="No quotes yet" />
             </Card>
             <Card icon={BarChart3} title="Briefings by category">
-              <VerticalBars data={stats.categories} empty="No categories yet" barClass="bg-gradient-to-t from-purple-500 to-blue-500" />
+              <VerticalBars data={stats.categories} empty="No categories yet" barClass="bg-gray-400 dark:bg-gray-600" />
             </Card>
             <Card icon={DollarSign} title="Average quote price by category">
               <HorizontalBars data={stats.avgPriceByCategory} empty="No pricing data yet" format={(v) => v.toLocaleString()} />

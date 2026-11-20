@@ -38,7 +38,7 @@ export default function ReplyBox({ thread, onReply }) {
         <button
           onClick={send}
           disabled={sending || !text.trim()}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed"
+          className="btn-primary"
         >
           <Send size={14} /> {sending ? "Sending…" : "Send reply"}
         </button>

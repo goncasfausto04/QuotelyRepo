@@ -4,7 +4,7 @@ export default function WeightRow({ param, config, onChange }) {
   const higher = config.direction === "higher";
   return (
     <div
-      className={`flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:gap-4 p-4 border-2 rounded-xl transition ${
+      className={`flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:gap-4 p-4 border-2 rounded-lg transition ${
         config.enabled ? "bg-white dark:bg-gray-800 border-blue-200 dark:border-blue-700" : "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 opacity-60"
       }`}
     >

@@ -23,7 +23,7 @@ export default function SupplierMap({ suppliers, center, selected, focused, onTo
   const points = located.map((s) => [s.lat, s.lng]);
 
   return (
-    <div className="h-80 sm:h-[28rem] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative z-0">
+    <div className="h-80 sm:h-[28rem] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 relative z-0">
       <MapContainer center={center ? [center.lat, center.lng] : EUROPE} zoom={center ? 10 : 4} className="h-full w-full" scrollWheelZoom>
         <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <FitBounds points={points} center={center} />
@@ -40,7 +40,7 @@ export default function SupplierMap({ suppliers, center, selected, focused, onTo
                 color: "#fff",
                 weight: 2,
                 fillOpacity: 0.95,
-                fillColor: isSelected ? "#16a34a" : canSend ? "#2563eb" : "#9ca3af",
+                fillColor: isSelected ? "#059669" : canSend ? "#2c5480" : "#a8a29e",
               }}
               eventHandlers={{ click: () => onFocus(key) }}
             >

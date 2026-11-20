@@ -14,7 +14,7 @@ export default function EmailInput({ busy, onAnalyze }) {
         className={`${fieldCls} p-3 font-mono text-sm`}
       />
       <button onClick={async () => (await onAnalyze(text)) && setText("")} disabled={disabled} className={primaryBtn(disabled)}>
-        {busy ? "Analyzing..." : "🔍 Analyze email"}
+        {busy ? "Analyzing..." : "Analyze email"}
       </button>
     </div>
   );

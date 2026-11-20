@@ -13,7 +13,7 @@ export default function SavedQuoteSummary({ quote, compareHref }) {
   ];
   return (
     <div className="mt-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-      <h4 className="font-semibold text-green-800 dark:text-green-200 mb-3">✅ Quote saved</h4>
+      <h4 className="font-semibold text-green-800 dark:text-green-200 mb-3">Quote saved</h4>
       <dl className="grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
         {rows.map(([k, v]) => (
           <div key={k}>
@@ -22,7 +22,7 @@ export default function SavedQuoteSummary({ quote, compareHref }) {
           </div>
         ))}
       </dl>
-      <a href={compareHref} className="mt-4 block text-center w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+      <a href={compareHref} className="btn-primary w-full mt-4">
         Compare quotes →
       </a>
     </div>

@@ -48,7 +48,7 @@ export default function ManualQuoteForm({ busy, onSave }) {
       <input placeholder="Payment terms" value={d.payment_terms} onChange={set("payment_terms")} className={fieldCls} />
       <textarea rows={3} placeholder="Notes" value={d.notes} onChange={set("notes")} className={fieldCls} />
       <button onClick={save} disabled={disabled} className={primaryBtn(disabled)}>
-        {busy ? "Saving..." : "💾 Save quote"}
+        {busy ? "Saving..." : "Save quote"}
       </button>
     </div>
   );

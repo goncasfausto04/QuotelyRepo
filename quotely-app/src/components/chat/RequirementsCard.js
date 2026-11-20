@@ -15,8 +15,8 @@ export default function RequirementsCard({ spec }) {
   if (!rows.length && !details.length) return null;
 
   return (
-    <div className="mb-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm">
-      <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">What I've got so far</div>
+    <div className="mb-3 p-3 rounded-md bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm">
+      <div className="text-xs font-medium text-gray-500 mb-2">So far</div>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
         {rows.map(([label, value]) => (
           <div key={label} className="flex gap-2 min-w-0">

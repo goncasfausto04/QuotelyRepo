@@ -115,11 +115,11 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50 dark:bg-gray-950">
+    <div className="px-4 sm:px-6 py-10 sm:py-16">
       <div className="w-full max-w-4xl mx-auto">
         <div className="flex flex-col md:flex-row items-stretch gap-6">
           {/* Banner Image for md+ */}
-          <div className="hidden md:block md:w-1/2 rounded-lg overflow-hidden shadow-xl">
+          <div className="hidden md:block md:w-1/2 rounded-lg overflow-hidden shadow-sm">
             <img
               src="/banner.jpg"
               alt="Quotely Banner"
@@ -128,7 +128,7 @@ export default function AuthPage() {
           </div>
 
           {/* Mobile banner */}
-          <div className="md:hidden w-full h-40 rounded-lg overflow-hidden shadow-md">
+          <div className="md:hidden w-full h-40 rounded-lg overflow-hidden ">
             <img
               src="/banner.jpg"
               alt="Quotely Banner"
@@ -137,27 +137,18 @@ export default function AuthPage() {
           </div>
 
           {/* Auth Card */}
-          <div className="w-full md:w-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6">
-            {/* Logo */}
-            <div className="flex justify-center mb-6">
-              <img
-                src="/whitelogo.jpg"
-                alt="Quotely Logo"
-                className="w-16 h-16 object-contain"
-              />
-            </div>
-
+          <div className="card w-full md:w-1/2 p-6 sm:p-8 self-center">
             {/* Heading */}
             <h2
               className="text-xl font-semibold text-center mb-1 text-gray-900 dark:text-white"
-              style={{ letterSpacing: "-0.6px" }}
+             
             >
-              {isForgotPassword ? "Reset Password" : "Welcome to Quotely"}
+              {isForgotPassword ? "Reset your password" : isLogin ? "Sign in to Quotely" : "Create your account"}
             </h2>
             <p className="text-center text-sm mb-6 text-gray-600 dark:text-gray-400">
               {isForgotPassword
                 ? "Enter your email to receive a reset link"
-                : "Turn briefings into smart decisions"}
+                : "Your requests, supplier replies and quotes in one place"}
             </p>
 
             {/* Tab List */}
@@ -179,7 +170,7 @@ export default function AuthPage() {
                     setPasswordError("");
                   }}
                 >
-                  Sign In
+                  Sign in
                 </button>
                 <button
                   className={`flex-1 py-2 px-4 rounded text-sm font-semibold transition-all ${
@@ -196,7 +187,7 @@ export default function AuthPage() {
                     setPasswordError("");
                   }}
                 >
-                  Sign Up
+                  Create account
                 </button>
               </div>
             )}
@@ -217,7 +208,7 @@ export default function AuthPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                  <label className="label">
                     Name
                   </label>
                   <input
@@ -226,14 +217,14 @@ export default function AuthPage() {
                     placeholder="Your name"
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-500"
+                    className="input"
                     required
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-semibold mb-2 text-gray-900 dark:text-white">
+                <label className="label">
                   Email
                 </label>
                 <input
@@ -242,14 +233,14 @@ export default function AuthPage() {
                   placeholder="your@email.com"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-500"
+                  className="input"
                   required
                 />
               </div>
 
               {!isForgotPassword && (
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-900 dark:text-white">
+                  <label className="label">
                     Password
                   </label>
                   <input
@@ -258,7 +249,7 @@ export default function AuthPage() {
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-500"
+                    className="input"
                     required
                   />
                 </div>
@@ -266,7 +257,7 @@ export default function AuthPage() {
 
               {!isLogin && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                  <label className="label">
                     Confirm Password
                   </label>
                   <input
@@ -275,7 +266,7 @@ export default function AuthPage() {
                     placeholder="••••••••"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-500"
+                    className="input"
                     required
                   />
                   {passwordError && (
@@ -292,22 +283,15 @@ export default function AuthPage() {
                     !isForgotPassword &&
                     formData.password !== formData.confirmPassword)
                 }
-                className={`w-full bg-blue-700 dark:bg-blue-600 text-white py-2 px-4 rounded-md text-sm font-semibold transition-all ${
-                  isLoading ||
-                  (!isLogin &&
-                    !isForgotPassword &&
-                    formData.password !== formData.confirmPassword)
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-blue-800 dark:hover:bg-blue-700"
-                }`}
+                className="btn-primary w-full"
               >
                 {isLoading
-                  ? "Loading..."
+                  ? "Please wait…"
                   : isForgotPassword
-                  ? "Send Reset Link"
+                  ? "Send reset link"
                   : isLogin
-                  ? "Sign In"
-                  : "Sign Up"}
+                  ? "Sign in"
+                  : "Create account"}
               </button>
             </form>
 
@@ -321,7 +305,7 @@ export default function AuthPage() {
                   }}
                   className="text-sm font-medium hover:underline text-blue-700 dark:text-blue-400"
                 >
-                  ← Back to Sign In
+                  ← Back to sign in
                 </button>
               </div>
             )}
@@ -336,7 +320,7 @@ export default function AuthPage() {
                   }}
                   className="text-sm font-medium hover:underline text-blue-700 dark:text-blue-400"
                 >
-                  Forgot Password?
+                  Forgot your password?
                 </button>
               </div>
             )}

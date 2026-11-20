@@ -1,155 +1,59 @@
 import { Link } from "react-router-dom";
-import {
-  ArrowRight,
-  FileText,
-  Zap,
-  Sparkles,
-  BarChart3,
-  PlayCircle,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import SampleComparison from "../components/landing/SampleComparison.js";
+
+const STEPS = [
+  ["Describe what you need", "Answer a few questions in plain language. Quotely turns it into a clear request for quote, signed with your details."],
+  ["Find and contact suppliers", "Search for suppliers near you on a map and send each one a private email in one go."],
+  ["Collect the replies", "Answers land in one inbox. Approve a reply and the price, delivery time and terms are pulled out for you."],
+  ["Compare like for like", "Every quote in one currency, shipping included, with the best value in each row marked."],
+];
 
 export default function LandingPage() {
-  // Optional: set REACT_APP_PROMO_VIDEO_URL in .env or place promo.mp4 in /public
-  const promoUrl = "/landingvideo.mp4";
-
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
-      {/* Hero Section */}
-      <main className="flex-1">
-        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 text-center">
-          <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-full px-4 py-2 mb-8">
-            <Sparkles className="text-blue-600 dark:text-blue-400" size={16} />
-            <span className="text-sm text-blue-800 dark:text-blue-300 font-medium">
-              AI-Powered Quote Analysis
-            </span>
-          </div>
-
-          <h1 className="text-3xl sm:text-6xl font-bold mb-6 leading-tight text-gray-900 dark:text-white">
-            Compare Supplier Quotes
+    <div className="bg-white dark:bg-gray-950">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-20 grid lg:grid-cols-2 gap-12 items-center">
+        <div>
+          <p className="text-sm font-medium text-blue-700 dark:text-blue-400 mb-4">For small teams that buy from suppliers</p>
+          <h1 className="text-4xl sm:text-5xl font-semibold leading-[1.1] text-gray-900 dark:text-white">
+            Get three quotes.
             <br />
-            <span className="text-blue-600 dark:text-blue-400">
-              Make Smarter Decisions
-            </span>
+            Pick the right one.
           </h1>
-
-          <p className="text-base sm:text-xl text-gray-600 dark:text-gray-300 mb-10 max-w-3xl mx-auto">
-            Analyze supplier quotes with AI, compare pricing and terms, and find
-            the best value for your business.
+          <p className="mt-5 text-lg text-gray-600 dark:text-gray-300 max-w-xl">
+            Quotely writes your quote request, sends it to suppliers, reads their replies and lines the offers up side by side, so you're not
+            comparing PDFs and email threads by hand.
           </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <Link
-              to="/briefings"
-              className="w-full sm:w-auto bg-blue-600 dark:bg-blue-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition flex items-center gap-2 font-semibold text-lg justify-center"
-            >
-              Get Started <ArrowRight size={20} />
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link to="/briefings/create-briefing" className="btn-primary px-5 py-2.5 text-base">
+              Start a request <ArrowRight size={18} />
+            </Link>
+            <Link to="/auth" className="btn-secondary px-5 py-2.5 text-base">
+              Sign in
             </Link>
           </div>
-
-          {/* Promo video (use REACT_APP_PROMO_VIDEO_URL or /promo.mp4 in public) */}
-          <div className="max-w-4xl mx-auto mb-16">
-            {promoUrl ? (
-              <div className="relative aspect-video rounded-2xl border-2 border-gray-300 dark:border-gray-700 shadow-xl overflow-hidden">
-                <video
-                  className="w-full h-full object-cover bg-black"
-                  controls
-                  playsInline
-                  src={promoUrl}
-                />
-              </div>
-            ) : (
-              <div className="relative aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-300 dark:border-gray-700 shadow-xl overflow-hidden">
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <PlayCircle
-                    className="text-gray-400 dark:text-gray-600 mb-4"
-                    size={64}
-                  />
-                  <p className="text-gray-500 dark:text-gray-400 font-medium">
-                    Promotional Video Coming Soon
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
+        <SampleComparison />
+      </section>
 
-        {/* Features Section */}
-        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 pb-20">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900 dark:text-white">
-              Everything You Need
-            </h2>
-            <p className="text-lg text-gray-600 dark:text-gray-300">
-              Powerful features for smarter quote analysis
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 hover:shadow-xl dark:hover:shadow-blue-900/20 transition">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-5">
-                <FileText
-                  className="text-blue-600 dark:text-blue-400"
-                  size={24}
-                />
-              </div>
-              <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">
-                AI Quote Analysis
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-                Extract pricing, terms, and specifications from supplier emails
-                automatically with AI-powered parsing.
-              </p>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 hover:shadow-xl dark:hover:shadow-blue-900/20 transition">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-5">
-                <BarChart3
-                  className="text-blue-600 dark:text-blue-400"
-                  size={24}
-                />
-              </div>
-              <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">
-                Smart Comparison
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-                Compare quotes side-by-side with customizable weights to find
-                the best value for your needs.
-              </p>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 hover:shadow-xl dark:hover:shadow-blue-900/20 transition">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-5">
-                <Zap className="text-blue-600 dark:text-blue-400" size={24} />
-              </div>
-              <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">
-                Instant Results
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-                Get comprehensive analysis in seconds. Save hours of manual
-                comparison work.
-              </p>
-            </div>
-          </div>
+      <section className="border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16">
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-10">How it works</h2>
+          <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {STEPS.map(([title, text], i) => (
+              <li key={title}>
+                <div className="text-sm font-mono text-gray-400 mb-2">0{i + 1}</div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1.5">{title}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{text}</p>
+              </li>
+            ))}
+          </ol>
         </div>
-      </main>
+      </section>
 
-      {/* CTA Section */}
-      <section className="bg-blue-600 dark:bg-blue-800 text-white py-16 sm:py-20">
-        <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-6">
-            Ready to Get Started?
-          </h2>
-          <p className="text-lg sm:text-xl text-blue-100 dark:text-blue-200 mb-10">
-            Start analyzing supplier quotes and making better purchasing
-            decisions today.
-          </p>
-          <Link
-            to="/briefings"
-            className="inline-flex items-center gap-2 bg-white dark:bg-gray-100 text-blue-600 dark:text-blue-800 px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-200 transition font-semibold text-lg"
-          >
-            Get Started <ArrowRight size={20} />
-          </Link>
-        </div>
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-16">
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6">One-minute demo</h2>
+        <video className="w-full aspect-video rounded-lg border border-gray-200 dark:border-gray-800 bg-black" controls playsInline preload="metadata" src="/landingvideo.mp4" />
       </section>
     </div>
   );

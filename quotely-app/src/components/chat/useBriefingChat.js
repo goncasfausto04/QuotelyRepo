@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../../api.js";
 import { GREETING, loadChat, makeChatSaver, resetBriefingConversation, lastOfRole, phaseFrom } from "./chatStore.js";
 
-const errorText = (err) => `❌ ${(err?.message || "Something went wrong").replace(/[.\s]+$/, "")}.`;
+const errorText = (err) => `${(err?.message || "Something went wrong").replace(/[.\s]+$/, "")}.`;
 
 export default function useBriefingChat(briefingId) {
   const [messages, setMessages] = useState([GREETING]);
@@ -75,8 +75,8 @@ export default function useBriefingChat(briefingId) {
           retry: true, // nothing is sent, safe to repeat
         });
         const note = options.instructions
-          ? `✏️ ${res.summary || "Updated the email."}`
-          : "✅ Here's your quote request. Next: find suppliers on the map and send it to them.";
+          ? res.summary || "Updated the email."
+          : "Here's your quote request. Next, find suppliers and send it to them.";
         append({ role: "AI", content: note }, { role: "Email", content: res.email, isEmail: true });
       }),
     [run, append, briefingId],

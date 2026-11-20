@@ -52,7 +52,7 @@ export default function Admin() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-5">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin</h1>
+          <h1 className="page-title">Admin</h1>
           <button
             onClick={load}
             disabled={loading}

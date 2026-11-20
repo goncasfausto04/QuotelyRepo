@@ -8,7 +8,7 @@ export const VIEWS = [
 
 export default function InboxViews({ active, onChange, pending }) {
   return (
-    <div className="flex gap-1 p-1 rounded-xl bg-gray-100 dark:bg-gray-800 w-full sm:w-fit">
+    <div className="flex gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 w-full sm:w-fit">
       {VIEWS.map(([id, label, Icon]) => (
         <button
           key={id}

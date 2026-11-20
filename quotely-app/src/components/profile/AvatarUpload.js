@@ -29,7 +29,7 @@ export default function AvatarUpload({ url, onUpload }) {
       <button
         onClick={() => input.current?.click()}
         disabled={busy}
-        className="absolute bottom-0 right-0 p-2 rounded-full bg-blue-600 text-white shadow hover:bg-blue-700 disabled:opacity-60"
+        className="absolute bottom-0 right-0 p-2 rounded-full bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-60"
         title="Change photo"
       >
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}

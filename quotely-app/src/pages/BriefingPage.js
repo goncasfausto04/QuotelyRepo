@@ -46,24 +46,24 @@ export default function BriefingPage() {
   if (!briefing) return <BriefingNotFound />;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-4">
-          <Link to="/briefings" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition">
-            ← Back
+    <div className="min-h-screen">
+      <div className="bg-white dark:bg-gray-950">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 pt-5 pb-3">
+          <Link to="/briefings" className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white">
+            ← All briefings
           </Link>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white truncate">{briefing.title || "Untitled Briefing"}</h1>
+          <h1 className="page-title mt-1 truncate">{briefing.title || "Untitled Briefing"}</h1>
         </div>
       </div>
 
       <BriefingTabs active={tab} onChange={setTab} />
 
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {tab === "chat" && <BriefingChat briefingId={briefing.id} onGoToInbox={(view) => setTab("inbox", view)} />}
 
         {tab === "inbox" && (
           <>
-            <TabIntro color="blue" title="Inbox">
+            <TabIntro>
               Find suppliers on the map, send them your request, then approve their replies: the AI extracts prices and terms for comparison.
             </TabIntro>
             <BriefingInbox briefingId={briefing.id} />
@@ -72,7 +72,7 @@ export default function BriefingPage() {
 
         {tab === "analyze" && (
           <>
-            <TabIntro color="purple" title="Add a quote manually">
+            <TabIntro>
               Paste a supplier's quote email or upload a PDF. The AI extracts pricing, timelines and terms and saves it for comparison.
             </TabIntro>
             <QuoteAnalysis briefingId={briefing.id} />
@@ -81,8 +81,8 @@ export default function BriefingPage() {
 
         {tab === "compare" && (
           <>
-            <TabIntro color="green" title="Compare all quotes">
-              All saved quotes side by side. Best prices and fastest delivery are highlighted.
+            <TabIntro>
+              Every quote side by side in one currency, shipping included. The best value in each row is marked.
             </TabIntro>
             <ComparisonDashboard briefingId={briefing.id} />
           </>

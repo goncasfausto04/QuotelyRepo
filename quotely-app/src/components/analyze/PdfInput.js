@@ -14,7 +14,7 @@ export default function PdfInput({ busy, onAnalyze }) {
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Max 10MB</p>
       </label>
       <button onClick={async () => (await onAnalyze(file)) && setFile(null)} disabled={disabled} className={primaryBtn(disabled)}>
-        {busy ? "Analyzing PDF..." : "🔍 Analyze PDF"}
+        {busy ? "Analyzing PDF..." : "Analyze PDF"}
       </button>
     </div>
   );

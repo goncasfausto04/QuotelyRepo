@@ -9,7 +9,7 @@ const ROWS = [
 
 export default function HealthCard({ health }) {
   return (
-    <section className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+    <section className="card p-5">
       <h2 className="font-semibold text-gray-900 dark:text-white mb-3">System health</h2>
       <ul className="divide-y divide-gray-100 dark:divide-gray-700">
         {ROWS.map(([key, label, detail]) => {
