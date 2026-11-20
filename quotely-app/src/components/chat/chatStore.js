@@ -44,14 +44,6 @@ export async function resetBriefingConversation(briefingId) {
 
 export const lastOfRole = (messages, role) => [...messages].reverse().find((m) => m.role === role);
 
-export function suppliersFrom(messages) {
-  try {
-    return JSON.parse(lastOfRole(messages, "SupplierResults")?.content || "[]");
-  } catch {
-    return [];
-  }
-}
-
 export function phaseFrom(messages) {
   if (messages.some((m) => m.role === "Email")) return "done";
   if (messages.some((m) => m.role === "User")) return "interview";

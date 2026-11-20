@@ -4,7 +4,7 @@ const REQUIRED = ["GEMINI_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"];
 
 const OPTIONAL = {
   "Email (Gmail)": ["GMAIL_API_CLIENT_ID", "GMAIL_API_CLIENT_SECRET", "GMAIL_API_REFRESH_TOKEN", "GMAIL_API_SENDER"],
-  "Supplier search": ["GOOGLE_SEARCH_API_KEY", "GOOGLE_SEARCH_ENGINE_ID"],
+  "Supplier search fallback (optional, Gemini web search is used first)": ["GOOGLE_SEARCH_API_KEY", "GOOGLE_SEARCH_ENGINE_ID"],
   "Admin dashboard": ["ADMIN_EMAILS"],
 };
 

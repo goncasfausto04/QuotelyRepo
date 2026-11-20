@@ -32,3 +32,23 @@ Rules:
 Return ONLY JSON:
 { "suppliers": [ { "name": "", "website": "", "contact_email": null, "phone": null, "note": "" } ] }`;
 }
+
+// Used with Gemini's Google Search tool: the model searches the web itself.
+export function groundedSuppliersPrompt({ spec, description, location }) {
+  return `Use Google Search to find real companies that can supply this need.
+
+NEED: ${describe(spec) || description}
+LOCATION: ${location || "anywhere (prefer suppliers that ship internationally)"}
+
+Find up to 8 suppliers (manufacturers, wholesalers, distributors or service providers), closest to the location first.
+For each one give its official details as shown on its website or business listing:
+- name, website
+- contact_email: a public sales/contact email ONLY if you actually found it, otherwise null
+- phone, address (street address), city, country
+- note: one short sentence on why it fits
+
+Never invent companies, emails, phones or addresses. Use null for anything you didn't find.
+
+Return ONLY JSON, no other text:
+{ "suppliers": [ { "name": "", "website": null, "contact_email": null, "phone": null, "address": null, "city": null, "country": null, "note": "" } ] }`;
+}

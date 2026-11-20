@@ -1,7 +1,7 @@
 // The generated RFQ email shown in the chat, with copy / regenerate / send.
 
 import { useState } from "react";
-import { Copy, Check, RotateCcw, Send } from "lucide-react";
+import { Copy, Check, RotateCcw, Send, MapPin } from "lucide-react";
 
 export default function EmailCard({ text, faded, actions }) {
   const [copied, setCopied] = useState(false);
@@ -29,10 +29,17 @@ export default function EmailCard({ text, faded, actions }) {
       {actions && (
         <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex flex-wrap gap-2">
           <button
-            onClick={actions.onSend}
+            onClick={actions.onFind}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700"
           >
-            <Send size={14} /> Send to suppliers
+            <MapPin size={14} /> Find suppliers
+          </button>
+          <button
+            onClick={actions.onSend}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600"
+            title="Send to suppliers you already know"
+          >
+            <Send size={14} /> I have suppliers
           </button>
           <button
             onClick={copy}

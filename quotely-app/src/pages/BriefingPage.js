@@ -33,9 +33,11 @@ export default function BriefingPage() {
       });
   }, [briefingId]);
 
-  const setTab = (id) => {
+  const setTab = (id, view) => {
     const next = new URLSearchParams(params);
     next.set("tab", id);
+    if (view) next.set("view", view);
+    else next.delete("view");
     setParams(next, { replace: true });
     window.scrollTo({ top: 0 });
   };
@@ -57,12 +59,12 @@ export default function BriefingPage() {
       <BriefingTabs active={tab} onChange={setTab} />
 
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {tab === "chat" && <BriefingChat briefingId={briefing.id} onGoToInbox={() => setTab("inbox")} />}
+        {tab === "chat" && <BriefingChat briefingId={briefing.id} onGoToInbox={(view) => setTab("inbox", view)} />}
 
         {tab === "inbox" && (
           <>
             <TabIntro color="blue" title="Inbox">
-              Send your request to suppliers, then approve their replies: the AI extracts prices and terms for comparison.
+              Find suppliers on the map, send them your request, then approve their replies: the AI extracts prices and terms for comparison.
             </TabIntro>
             <BriefingInbox briefingId={briefing.id} />
           </>

@@ -13,7 +13,7 @@ import { sendEmail } from "./inboxApi.js";
 const inputCls =
   "w-full p-2.5 border rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-export default function EmailComposer({ briefingId, briefingTitle, generatedEmail = "", suggestions = [], contacted = [], emailStatus, onSent }) {
+export default function EmailComposer({ briefingId, briefingTitle, generatedEmail = "", suggestions = [], contacted = [], emailStatus, presetRecipients, onSent }) {
   const generated = useMemo(() => splitSubject(generatedEmail), [generatedEmail]);
   const defaultSubject = generated.subject || (briefingTitle ? `Request for quote: ${briefingTitle}` : "Request for quote");
 
@@ -40,6 +40,12 @@ export default function EmailComposer({ briefingId, briefingTitle, generatedEmai
       const seen = new Set(prev.map(lower));
       return [...prev, ...list.filter((a) => !seen.has(lower(a)) && seen.add(lower(a)))];
     });
+
+  // Suppliers picked in "Find suppliers"
+  useEffect(() => {
+    if (presetRecipients?.length) add(presetRecipients);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetRecipients]);
 
   const allRecipients = () => {
     const typed = parseRecipients(draft).good.filter((a) => !recipientSet.has(lower(a)));

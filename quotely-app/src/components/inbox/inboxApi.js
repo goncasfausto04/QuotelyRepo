@@ -26,23 +26,24 @@ export async function setEmailStatus(briefingId, messageId, status) {
   if (error) throw error;
 }
 
-// Title, generated email and found suppliers (from the chat)
+// Title, generated email, requirements and found suppliers
 export async function fetchBriefingInfo(briefingId) {
-  const { data, error } = await supabase.from("briefings").select("title, chat").eq("id", briefingId).single();
-  if (error || !data) return { title: "", generatedEmail: "", suppliers: [] };
+  const { data, error } = await supabase.from("briefings").select("title, chat, conversation_state").eq("id", briefingId).single();
+  if (error || !data) return { title: "", generatedEmail: "", suppliers: [], spec: null };
   const chat = Array.isArray(data.chat) ? [...data.chat].reverse() : [];
-  let suppliers = [];
-  try {
-    suppliers = JSON.parse(chat.find((m) => m.role === "SupplierResults")?.content || "[]")
-      .filter((s) => s?.contact_email)
-      .map((s) => ({ name: s.name, email: String(s.contact_email).trim() }));
-  } catch {
-    /* ignore bad JSON */
+  let found = data.conversation_state?.suppliers?.suppliers;
+  if (!found) {
+    try {
+      found = JSON.parse(chat.find((m) => m.role === "SupplierResults")?.content || "[]");
+    } catch {
+      found = [];
+    }
   }
   return {
     title: data.title || "",
     generatedEmail: chat.find((m) => m.role === "Email")?.content || "",
-    suppliers,
+    suppliers: (found || []).filter((s) => s?.contact_email).map((s) => ({ name: s.name, email: String(s.contact_email).trim() })),
+    spec: data.conversation_state?.spec || null,
   };
 }
 

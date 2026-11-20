@@ -38,6 +38,7 @@ export function loadConversation(briefing) {
       spec: { ...EMPTY_SPEC, ...(state.spec || {}) },
       language: state.language || null,
       done: !!state.done,
+      ...(state.suppliers ? { suppliers: state.suppliers } : {}),
     };
   }
   const chat = Array.isArray(briefing.chat) ? briefing.chat : [];

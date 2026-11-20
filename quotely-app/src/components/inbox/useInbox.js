@@ -15,7 +15,7 @@ export default function useInbox(briefingId) {
   const [notice, setNotice] = useState(null); // { type, text }
   const [analyzingId, setAnalyzingId] = useState(null);
   const [emailStatus, setEmailStatus] = useState(null);
-  const [info, setInfo] = useState({ title: "", generatedEmail: "", suppliers: [] });
+  const [info, setInfo] = useState({ title: "", generatedEmail: "", suppliers: [], spec: null });
   const inFlight = useRef(false);
 
   const flash = useCallback((type, text) => {
@@ -125,7 +125,10 @@ export default function useInbox(briefingId) {
   const threads = useMemo(() => groupThreads(emails), [emails]);
   const contacted = useMemo(() => threads.map((t) => t.counterpart.address).filter(Boolean), [threads]);
 
+  const reloadInfo = useCallback(() => api.fetchBriefingInfo(briefingId).then(setInfo), [briefingId]);
+
   return {
+    reloadInfo,
     threads, contacted, loading, refreshing, error, lastUpdated, notice, setNotice, analyzingId,
     emailStatus, info, refresh, afterSend, approve, updateStatus, reply,
   };

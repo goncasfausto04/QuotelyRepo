@@ -70,6 +70,17 @@ export async function generateText(ai, contents, { retries = 3, baseDelay = 1000
   return text;
 }
 
+// Text generation with Gemini's Google Search tool (live web results).
+// JSON mode can't be combined with tools, so the JSON is parsed from text.
+export async function generateGroundedJson(ai, contents, { retries = 3, baseDelay = 1500 } = {}) {
+  const response = await retryWithBackoff(
+    () => ai.models.generateContent({ model: GEMINI_MODEL, contents, config: { tools: [{ googleSearch: {} }] } }),
+    retries,
+    baseDelay,
+  );
+  return parseModelJson(response.text);
+}
+
 // User-facing message for AI failures
 export function aiErrorMessage(err, fallback) {
   const status = Number(errorStatus(err));

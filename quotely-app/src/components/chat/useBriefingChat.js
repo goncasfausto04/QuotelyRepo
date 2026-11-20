@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../../api.js";
-import { GREETING, loadChat, makeChatSaver, resetBriefingConversation, lastOfRole, suppliersFrom, phaseFrom } from "./chatStore.js";
+import { GREETING, loadChat, makeChatSaver, resetBriefingConversation, lastOfRole, phaseFrom } from "./chatStore.js";
 
 const errorText = (err) => `❌ ${(err?.message || "Something went wrong").replace(/[.\s]+$/, "")}.`;
 
@@ -47,7 +47,6 @@ export default function useBriefingChat(briefingId) {
 
   const phase = phaseFrom(messages);
   const email = lastOfRole(messages, "Email")?.content || "";
-  const suppliers = suppliersFrom(messages);
 
   // Runs an async step with busy state + friendly error + retry button
   const run = useCallback(
@@ -77,7 +76,7 @@ export default function useBriefingChat(briefingId) {
         });
         const note = options.instructions
           ? `✏️ ${res.summary || "Updated the email."}`
-          : "✅ Here's your quote request. Review it, then send it to suppliers from the Inbox tab.";
+          : "✅ Here's your quote request. Next: find suppliers on the map and send it to them.";
         append({ role: "AI", content: note }, { role: "Email", content: res.email, isEmail: true });
       }),
     [run, append, briefingId],
@@ -116,28 +115,6 @@ export default function useBriefingChat(briefingId) {
   // "That's all" button: let the assistant wrap up with what it has
   const finishNow = useCallback(() => send("That's all the information I have, please write the email now."), [send]);
 
-  const searchSuppliers = useCallback(
-    (location) =>
-      run("searching", async () => {
-        const res = await apiFetch("/api/search-suppliers", {
-          method: "POST",
-          json: { briefingId, location },
-          retry: true,
-        });
-        const found = res.suppliers || [];
-        append(
-          {
-            role: "AI",
-            content: found.length
-              ? `🔎 Found ${found.length} supplier${found.length === 1 ? "" : "s"}${location ? ` near ${location}` : ""}. The ones with an email can be added with one click in the Inbox tab.`
-              : "🔎 No suppliers found. Try a broader location or different wording.",
-          },
-          { role: "SupplierResults", content: JSON.stringify(found) },
-        );
-      }),
-    [run, append, briefingId],
-  );
-
   const reset = useCallback(async () => {
     await resetBriefingConversation(briefingId);
     setMessages([GREETING]);
@@ -145,5 +122,5 @@ export default function useBriefingChat(briefingId) {
     setRetry(null);
   }, [briefingId]);
 
-  return { messages, loaded, busy, phase, spec, email, suppliers, retry, send, finishNow, writeEmail, searchSuppliers, reset };
+  return { messages, loaded, busy, phase, spec, email, retry, send, finishNow, writeEmail, reset };
 }

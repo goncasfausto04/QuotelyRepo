@@ -7,7 +7,6 @@ import ChatMessage from "./ChatMessage.js";
 import ChatInput from "./ChatInput.js";
 import TypingIndicator from "./TypingIndicator.js";
 import RequirementsCard from "./RequirementsCard.js";
-import SupplierSearchPanel from "./SupplierSearchPanel.js";
 import ProfileHint from "./ProfileHint.js";
 
 export default function BriefingChat({ briefingId, onGoToInbox }) {
@@ -36,7 +35,7 @@ export default function BriefingChat({ briefingId, onGoToInbox }) {
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Quote request assistant</h2>
           <p className="text-gray-600 dark:text-gray-400 text-sm">
             {chat.phase === "done"
-              ? "Your email is ready. Ask for changes below, or send it to suppliers."
+              ? "Your email is ready. Ask for changes below, or find suppliers to send it to."
               : "Answer a few quick questions and I'll write a professional quote request."}
           </p>
         </div>
@@ -56,7 +55,7 @@ export default function BriefingChat({ briefingId, onGoToInbox }) {
             key={i}
             message={m}
             isLatestEmail={i === lastEmailIndex}
-            emailActions={{ onSend: onGoToInbox, onRegenerate: () => chat.writeEmail(), busy: !!chat.busy }}
+            emailActions={{ onFind: () => onGoToInbox("suppliers"), onSend: () => onGoToInbox("conversations"), onRegenerate: () => chat.writeEmail(), busy: !!chat.busy }}
           />
         ))}
         <TypingIndicator kind={chat.busy} />
@@ -75,15 +74,6 @@ export default function BriefingChat({ briefingId, onGoToInbox }) {
         </button>
       )}
 
-      {chat.phase === "done" && (
-        <SupplierSearchPanel
-          suppliers={chat.suppliers}
-          defaultLocation={chat.spec?.delivery_location || ""}
-          busy={chat.busy}
-          onSearch={chat.searchSuppliers}
-          onGoToInbox={onGoToInbox}
-        />
-      )}
     </div>
   );
 }

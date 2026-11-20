@@ -4,7 +4,7 @@ const ROWS = [
   ["db", "Database (Supabase)", (h) => (h.ok ? `${h.latencyMs} ms` : h.error)],
   ["email", "Gmail", (h) => (h.ok ? h.sender : h.error)],
   ["ai", "AI (Gemini)", (h) => (h.ok ? h.model : "GEMINI_API_KEY missing")],
-  ["search", "Supplier search", (h) => (h.ok ? "Google Custom Search configured" : "GOOGLE_SEARCH_* keys missing")],
+  ["search", "Supplier search", (h) => (h.ok ? h.detail : "Needs GEMINI_API_KEY")],
 ];
 
 export default function HealthCard({ health }) {

@@ -1,7 +1,7 @@
 // Health checks shared by /health/* and the admin dashboard.
 
 import { checkGmailAuth } from "./gmail.js";
-import { isSearchConfigured } from "./supplierSearch.js";
+import { isCustomSearchConfigured } from "./supplierSearch.js";
 
 export async function checkDb(supabase) {
   const started = Date.now();
@@ -24,6 +24,9 @@ export async function fullHealth(supabase) {
     db,
     email: { ...email, sender: process.env.GMAIL_API_SENDER || null },
     ai: { ok: !!process.env.GEMINI_API_KEY, model: process.env.GEMINI_MODEL || "gemini-2.5-flash" },
-    search: { ok: isSearchConfigured() },
+    search: {
+      ok: !!process.env.GEMINI_API_KEY,
+      detail: `Gemini web search${isCustomSearchConfigured() ? " + Google Custom Search fallback" : ""}, OpenStreetMap geocoding`,
+    },
   };
 }

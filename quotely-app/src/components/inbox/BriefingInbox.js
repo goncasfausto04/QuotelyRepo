@@ -1,24 +1,34 @@
-// Briefing inbox: composer for new requests + one conversation per supplier.
+// Briefing inbox: "Conversations" (send + replies) and "Find suppliers" (map).
+// The sub-tab lives in the URL (?view=suppliers) so other pages can link to it.
 
-import { useMemo, useState } from "react";
-import { Mail } from "lucide-react";
-import Notice from "../ui/Notice.js";
+import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import useInbox from "./useInbox.js";
-import InboxHeader from "./InboxHeader.js";
-import ThreadCard from "./ThreadCard.js";
-import EmailComposer from "./EmailComposer.js";
+import InboxViews from "./InboxViews.js";
+import ConversationsView from "./ConversationsView.js";
+import SupplierFinder from "../suppliers/SupplierFinder.js";
 
 export default function BriefingInbox({ briefingId }) {
   const inbox = useInbox(briefingId);
-  const [filter, setFilter] = useState("all");
-  const [expanded, setExpanded] = useState(null);
+  const [params, setParams] = useSearchParams();
+  const view = params.get("view") === "suppliers" ? "suppliers" : "conversations";
   const [composerOpen, setComposerOpen] = useState(false);
+  const [presetRecipients, setPresetRecipients] = useState(null);
 
-  const counts = useMemo(() => {
-    const c = { all: inbox.threads.length };
-    inbox.threads.forEach((t) => (c[t.state] = (c[t.state] || 0) + 1));
-    return c;
-  }, [inbox.threads]);
+  const setView = (v) => {
+    const next = new URLSearchParams(params);
+    next.set("view", v);
+    setParams(next, { replace: true });
+  };
+
+  // From the map: open the composer with the chosen suppliers
+  const sendTo = (suppliers) => {
+    setPresetRecipients(suppliers.map((s) => s.email));
+    setComposerOpen(true);
+    inbox.reloadInfo();
+    setView("conversations");
+    window.scrollTo({ top: 0 });
+  };
 
   if (inbox.loading) {
     return (
@@ -29,75 +39,20 @@ export default function BriefingInbox({ briefingId }) {
     );
   }
 
-  const visible = filter === "all" ? inbox.threads : inbox.threads.filter((t) => t.state === filter);
-  const showComposer = composerOpen || inbox.threads.length === 0;
-
   return (
     <div className="space-y-4">
-      <InboxHeader
-        total={inbox.threads.length}
-        counts={counts}
-        lastUpdated={inbox.lastUpdated}
-        refreshing={inbox.refreshing}
-        filter={filter}
-        onFilter={setFilter}
-        onNew={() => setComposerOpen((o) => !o)}
-        onRefresh={() => inbox.refresh()}
-      />
-
-      {inbox.notice && (
-        <Notice type={inbox.notice.type} onClose={() => inbox.setNotice(null)}>
-          {inbox.notice.text}
-        </Notice>
-      )}
-
-      {inbox.error && (
-        <Notice
-          type="error"
-          action={
-            <button onClick={() => inbox.refresh()} className="text-sm px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 shrink-0">
-              Retry
-            </button>
-          }
-        >
-          <b>Couldn't load emails.</b> {inbox.error}
-        </Notice>
-      )}
-
-      {showComposer && (
-        <EmailComposer
-          briefingId={briefingId}
-          briefingTitle={inbox.info.title}
-          generatedEmail={inbox.info.generatedEmail}
-          suggestions={inbox.info.suppliers}
-          contacted={inbox.contacted}
-          emailStatus={inbox.emailStatus}
-          onSent={(res) => {
-            inbox.afterSend(res);
-            setFilter("all");
-          }}
-        />
-      )}
-
-      {!inbox.error && inbox.threads.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-8 text-center">
-          <Mail className="mx-auto text-gray-400 dark:text-gray-500 mb-3" size={40} />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">No conversations yet</h3>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">Send a quote request above. Supplier replies appear here automatically.</p>
-        </div>
+      <InboxViews active={view} onChange={setView} pending={inbox.threads.filter((t) => t.state === "pending").length} />
+      {view === "suppliers" ? (
+        <SupplierFinder briefingId={briefingId} defaultLocation={inbox.info.spec?.delivery_location || ""} contacted={inbox.contacted} onSend={sendTo} />
       ) : (
-        <div className="space-y-3">
-          {visible.map((t) => (
-            <ThreadCard
-              key={t.threadId}
-              thread={t}
-              open={expanded === t.threadId}
-              onToggle={() => setExpanded(expanded === t.threadId ? null : t.threadId)}
-              inbox={inbox}
-            />
-          ))}
-          {visible.length === 0 && inbox.threads.length > 0 && <p className="text-sm text-center text-gray-500 py-6">Nothing in this filter.</p>}
-        </div>
+        <ConversationsView
+          briefingId={briefingId}
+          inbox={inbox}
+          composerOpen={composerOpen}
+          setComposerOpen={setComposerOpen}
+          presetRecipients={presetRecipients}
+          onFindSuppliers={() => setView("suppliers")}
+        />
       )}
     </div>
   );
